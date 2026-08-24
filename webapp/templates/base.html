@@ -11,6 +11,9 @@
     <span class="brand">🖼️ Text-to-Image Studio</span>
     {% if current_user.is_authenticated %}
       <div class="nav-right">
+        {% if current_user.is_admin %}
+          <a href="{{ url_for('admin') }}" class="nav-link">Admin</a>
+        {% endif %}
         <span class="nav-user">สวัสดี, {{ current_user.username }}</span>
         <a href="{{ url_for('logout') }}" class="nav-link">ออกจากระบบ</a>
       </div>

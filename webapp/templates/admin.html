@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Admin - ภาพทั้งหมด{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <h2>ภาพที่ทุก User สร้าง</h2>
+  <p class="admin-meta">
+    แสดง {{ shown_count }} จาก {{ total_count }} รายการทั้งหมด (ล่าสุดก่อน)
+    {% if total_count > shown_count %}
+      — รายการเก่ากว่านี้ยังไม่แสดง เพื่อไม่ให้หน้าโหลดหนักเกินไป
+    {% endif %}
+  </p>
+
+  <input type="text" id="admin-search" class="admin-search"
+         placeholder="ค้นหาจาก username หรือ prompt...">
+</div>
+
+<div id="admin-grid" class="admin-grid">
+  {% for r in records %}
+  <div class="admin-card" data-username="{{ r['username']|lower }}" data-prompt="{{ r['prompt']|lower }}">
+    <img src="{{ url_for('static', filename=r['image_path']) }}" alt="{{ r['prompt'] }}">
+    <div class="admin-card-body">
+      <div class="admin-user-badge">{{ r['username'] }}</div>
+      <p class="admin-prompt"><strong>Prompt:</strong> {{ r['prompt'] }}</p>
+      {% if r['negative_prompt'] %}
+      <p class="admin-prompt admin-negative"><strong>Negative:</strong> {{ r['negative_prompt'] }}</p>
+      {% endif %}
+      <div class="admin-settings">
+        <span>Steps: {{ r['steps'] }}</span>
+        <span>CFG: {{ r['cfg_scale'] }}</span>
+        <span>{{ r['width'] }}x{{ r['height'] }}</span>
+        <span>{{ r['sampler'] }}</span>
+        <span>Seed: {{ r['seed'] }}</span>
+      </div>
+      <div class="admin-timestamp">{{ r['created_at'] }}</div>
+    </div>
+  </div>
+  {% else %}
+  <p class="placeholder-text">ยังไม่มีข้อมูลการสร้างภาพในระบบ</p>
+  {% endfor %}
+</div>
+
+<script>
+  const searchBox = document.getElementById("admin-search");
+  const cards = document.querySelectorAll("#admin-grid .admin-card");
+
+  searchBox.addEventListener("input", () => {
+    const q = searchBox.value.trim().toLowerCase();
+    cards.forEach((card) => {
+      const match = card.dataset.username.includes(q) || card.dataset.prompt.includes(q);
+      card.style.display = match ? "" : "none";
+    });
+  });
+</script>
+{% endblock %}

@@ -15,7 +15,7 @@ from flask_login import (
 # ============================================================
 #  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
 # ============================================================
-FORGE_API_URL = "http://172.20.57.72:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
+FORGE_API_URL = "http://10.141.1.225:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
 FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
 FORGE_API_PASS = "cdti1234"
 
@@ -53,6 +53,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )
     """)
@@ -74,23 +75,39 @@ def init_db():
         )
     """)
     conn.commit()
+
+    # --- migration: เผื่อฐานข้อมูลเก่าที่สร้างมาก่อนมีคอลัมน์ is_admin ---
+    existing_cols = [row["name"] for row in conn.execute("PRAGMA table_info(users)")]
+    if "is_admin" not in existing_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+
+    # ถ้ายังไม่มี admin เลยสักคน ให้ยกคนที่สมัครสมาชิกไว้ก่อนใครเป็น admin อัตโนมัติ
+    has_admin = conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").fetchone()["c"]
+    if not has_admin:
+        conn.execute(
+            "UPDATE users SET is_admin = 1 WHERE id = (SELECT MIN(id) FROM users)"
+        )
+        conn.commit()
+
     conn.close()
 
 
 # ---------- Flask-Login user model ----------
 class User(UserMixin):
-    def __init__(self, id, username):
+    def __init__(self, id, username, is_admin=False):
         self.id = id
         self.username = username
+        self.is_admin = bool(is_admin)
 
 
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db()
-    row = conn.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT id, username, is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     if row:
-        return User(row["id"], row["username"])
+        return User(row["id"], row["username"], row["is_admin"])
     return None
 
 
@@ -124,10 +141,17 @@ def register():
             flash("username นี้มีคนใช้แล้ว", "error")
             return redirect(url_for("register"))
 
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
             (username, generate_password_hash(password), datetime.utcnow().isoformat()),
         )
+        new_user_id = cursor.lastrowid
+
+        # ถ้ายังไม่มี admin คนไหนในระบบเลย ให้คนที่เพิ่งสมัครนี้เป็น admin คนแรกอัตโนมัติ
+        has_admin = conn.execute("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").fetchone()["c"]
+        if not has_admin:
+            conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (new_user_id,))
+
         conn.commit()
         conn.close()
         flash("สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ", "success")
@@ -150,7 +174,7 @@ def login():
         conn.close()
 
         if row and check_password_hash(row["password_hash"], password):
-            login_user(User(row["id"], row["username"]))
+            login_user(User(row["id"], row["username"], row["is_admin"]))
             next_page = request.args.get("next")
             return redirect(next_page or url_for("index"))
 
@@ -180,6 +204,41 @@ def index():
     ).fetchall()
     conn.close()
     return render_template("generate.html", history=history)
+
+
+# ============================================================
+#  ADMIN: ดูภาพที่ทุก user สร้าง พร้อม prompt/ค่าตั้งค่า
+# ============================================================
+ADMIN_RECORD_LIMIT = 300  # กันโหลดหนักถ้าข้อมูลเยอะมาก
+
+
+@app.route("/admin")
+@login_required
+def admin():
+    if not current_user.is_admin:
+        flash("หน้านี้สำหรับ admin เท่านั้น", "error")
+        return redirect(url_for("index"))
+
+    conn = get_db()
+    records = conn.execute(
+        """
+        SELECT generations.*, users.username AS username
+        FROM generations
+        JOIN users ON generations.user_id = users.id
+        ORDER BY generations.id DESC
+        LIMIT ?
+        """,
+        (ADMIN_RECORD_LIMIT,),
+    ).fetchall()
+    total_count = conn.execute("SELECT COUNT(*) AS c FROM generations").fetchone()["c"]
+    conn.close()
+
+    return render_template(
+        "admin.html",
+        records=records,
+        total_count=total_count,
+        shown_count=len(records),
+    )
 
 
 # ============================================================
