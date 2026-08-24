@@ -31,6 +31,9 @@
         <span>{{ r['width'] }}x{{ r['height'] }}</span>
         <span>{{ r['sampler'] }}</span>
         <span>Seed: {{ r['seed'] }}</span>
+        {% if r['checkpoint'] %}
+        <span>{{ r['checkpoint'] }}</span>
+        {% endif %}
       </div>
       <div class="admin-timestamp">{{ r['created_at'] }}</div>
 

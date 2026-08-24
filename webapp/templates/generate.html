@@ -72,6 +72,19 @@
       </div>
 
       <div class="row">
+        <div class="field field-full">
+          <label for="checkpoint">
+            Checkpoint
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="โมเดล/checkpoint ที่จะใช้สร้างภาพ สลับ checkpoint ครั้งแรกจะช้าเพราะต้องโหลดโมเดลใหม่ (อาจ 30-60 วินาที) ครั้งต่อไปที่ใช้ checkpoint เดิมจะเร็วขึ้นมาก">ⓘ</span>
+          </label>
+          <select id="checkpoint" name="checkpoint">
+            <option value="">(ใช้ checkpoint ที่โหลดอยู่ตอนนี้)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
         <div class="field">
           <label for="sampler">
             Sampler
@@ -105,6 +118,35 @@
     </div>
   </div>
 
+</div>
+
+<div class="panel">
+  <h2>
+    ตรวจสอบ PNG Info
+    <span class="info-icon" tabindex="0"
+          data-tooltip="อัปโหลดภาพที่สร้างจาก Stable Diffusion (ของระบบนี้หรือที่อื่นก็ได้) เพื่อดู prompt/ค่าตั้งค่าที่ฝังอยู่ในไฟล์ แล้วโหลดค่านั้นมาใช้สร้างภาพซ้ำได้ทันที">ⓘ</span>
+  </h2>
+
+  <div id="pnginfo-dropzone" class="dropzone">
+    <p>ลากไฟล์ PNG มาวางที่นี่ หรือ <span class="dropzone-link">คลิกเพื่อเลือกไฟล์</span></p>
+    <input type="file" id="pnginfo-file" accept="image/png" hidden>
+  </div>
+
+  <div id="pnginfo-status" class="status-box" style="display:none;"></div>
+
+  <div id="pnginfo-result" class="pnginfo-result" style="display:none;">
+    <div class="pnginfo-preview">
+      <img id="pnginfo-preview-img" alt="ภาพที่อัปโหลด">
+    </div>
+    <div class="pnginfo-details">
+      <div id="pnginfo-fields" class="admin-settings"></div>
+      <p class="admin-prompt"><strong>Prompt:</strong> <span id="pnginfo-prompt"></span></p>
+      <p class="admin-prompt admin-negative" id="pnginfo-negative-row">
+        <strong>Negative:</strong> <span id="pnginfo-negative"></span>
+      </p>
+      <button type="button" id="pnginfo-load-btn" class="btn-primary">ใช้ค่านี้สร้างภาพ</button>
+    </div>
+  </div>
 </div>
 
 <div class="panel history-panel">

@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cfgInput = document.getElementById("cfg_scale");
   const cfgVal = document.getElementById("cfg-val");
   const samplerSelect = document.getElementById("sampler");
+  const checkpointSelect = document.getElementById("checkpoint");
 
   stepsInput.addEventListener("input", () => (stepsVal.textContent = stepsInput.value));
   cfgInput.addEventListener("input", () => (cfgVal.textContent = cfgInput.value));
@@ -28,6 +29,22 @@ document.addEventListener("DOMContentLoaded", () => {
     })
     .catch(() => {
       // เงียบไว้ ใช้ค่า default "Euler a" ที่มีอยู่แล้วในหน้า
+    });
+
+  // โหลดรายชื่อ checkpoint จริงจาก Forge มาใส่ dropdown
+  // (ถ้าดึงไม่ได้/ไม่มี ก็เหลือแค่ตัวเลือก "ใช้ checkpoint ที่โหลดอยู่ตอนนี้" ไว้เฉย ๆ ไม่พัง)
+  fetch("/api/checkpoints")
+    .then((r) => r.json())
+    .then((checkpoints) => {
+      checkpoints.forEach((cp) => {
+        const opt = document.createElement("option");
+        opt.value = cp.title;
+        opt.textContent = cp.model_name;
+        checkpointSelect.appendChild(opt);
+      });
+    })
+    .catch(() => {
+      // เงียบไว้ เหลือแค่ตัวเลือก default
     });
 
   function showStatus(message, isError = false) {
@@ -66,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
       height: Number(document.getElementById("height").value),
       sampler: samplerSelect.value,
       seed: Number(document.getElementById("seed").value),
+      checkpoint: checkpointSelect.value,
     };
 
     btn.disabled = true;
@@ -109,5 +127,168 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.disabled = false;
       btn.textContent = "สร้างภาพ";
     }
+  });
+
+  // ============================================================
+  //  PNG Info: อัปโหลดภาพ -> อ่าน prompt/ค่าตั้งค่าที่ฝังอยู่ในไฟล์
+  // ============================================================
+  const dropzone = document.getElementById("pnginfo-dropzone");
+  const fileInput = document.getElementById("pnginfo-file");
+  const pnginfoStatus = document.getElementById("pnginfo-status");
+  const pnginfoResult = document.getElementById("pnginfo-result");
+  const pnginfoPreviewImg = document.getElementById("pnginfo-preview-img");
+  const pnginfoFields = document.getElementById("pnginfo-fields");
+  const pnginfoPromptEl = document.getElementById("pnginfo-prompt");
+  const pnginfoNegativeEl = document.getElementById("pnginfo-negative");
+  const pnginfoNegativeRow = document.getElementById("pnginfo-negative-row");
+  const pnginfoLoadBtn = document.getElementById("pnginfo-load-btn");
+
+  let lastParsed = null; // เก็บค่าที่ parse ได้ล่าสุด ไว้ให้ปุ่ม "ใช้ค่านี้สร้างภาพ" หยิบไปใช้
+
+  function showPnginfoStatus(message, isError = false) {
+    pnginfoStatus.style.display = "block";
+    pnginfoStatus.textContent = message;
+    pnginfoStatus.classList.toggle("error", isError);
+  }
+
+  function hidePnginfoStatus() {
+    pnginfoStatus.style.display = "none";
+  }
+
+  // หยิบค่าจาก parameters dict โดยลองหลายรูปแบบชื่อ key เผื่อเวอร์ชัน Forge ต่างกันเล็กน้อย
+  function pick(params, ...keys) {
+    for (const k of keys) {
+      if (params[k] !== undefined && params[k] !== null && params[k] !== "") {
+        return params[k];
+      }
+    }
+    return null;
+  }
+
+  function renderPngInfo(previewSrc, parameters) {
+    lastParsed = parameters;
+
+    pnginfoPreviewImg.src = previewSrc;
+
+    const prompt = pick(parameters, "Prompt", "prompt") || "(ไม่พบ prompt)";
+    const negative = pick(parameters, "Negative prompt", "negative_prompt", "Negative Prompt") || "";
+    const steps = pick(parameters, "Steps", "steps");
+    const sampler = pick(parameters, "Sampler", "sampler_name", "sampler");
+    const cfg = pick(parameters, "CFG scale", "cfg_scale");
+    const seed = pick(parameters, "Seed", "seed");
+    const size = pick(parameters, "Size", "size");
+    const model = pick(parameters, "Model", "model_name", "sd_model_name");
+
+    pnginfoPromptEl.textContent = prompt;
+
+    if (negative) {
+      pnginfoNegativeRow.style.display = "";
+      pnginfoNegativeEl.textContent = negative;
+    } else {
+      pnginfoNegativeRow.style.display = "none";
+    }
+
+    const tags = [];
+    if (steps) tags.push(`Steps: ${steps}`);
+    if (cfg) tags.push(`CFG: ${cfg}`);
+    if (size) tags.push(size);
+    if (sampler) tags.push(sampler);
+    if (seed) tags.push(`Seed: ${seed}`);
+    if (model) tags.push(model);
+    pnginfoFields.innerHTML = tags.map((t) => `<span>${t}</span>`).join("");
+
+    pnginfoResult.style.display = "grid";
+  }
+
+  async function handlePngFile(file) {
+    if (!file) return;
+    if (!file.type.includes("png")) {
+      showPnginfoStatus("รองรับเฉพาะไฟล์ .png เท่านั้น (ไฟล์ที่ Stable Diffusion สร้างจะฝังข้อมูลไว้ในรูปแบบนี้)", true);
+      return;
+    }
+
+    pnginfoResult.style.display = "none";
+    showPnginfoStatus("กำลังอ่านข้อมูลจากไฟล์...");
+
+    const previewSrc = URL.createObjectURL(file);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const res = await fetch("/api/png-info", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showPnginfoStatus(data.error || "อ่านข้อมูลไม่สำเร็จ", true);
+        return;
+      }
+
+      hidePnginfoStatus();
+      renderPngInfo(previewSrc, data.parameters || {});
+    } catch (err) {
+      showPnginfoStatus("เชื่อมต่อ server ไม่ได้: " + err.message, true);
+    }
+  }
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => handlePngFile(fileInput.files[0]));
+
+  ["dragover", "dragenter"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dropzone-active");
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dropzone-active");
+    })
+  );
+  dropzone.addEventListener("drop", (e) => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handlePngFile(file);
+  });
+
+  pnginfoLoadBtn.addEventListener("click", () => {
+    if (!lastParsed) return;
+
+    const prompt = pick(lastParsed, "Prompt", "prompt");
+    const negative = pick(lastParsed, "Negative prompt", "negative_prompt", "Negative Prompt");
+    const steps = pick(lastParsed, "Steps", "steps");
+    const sampler = pick(lastParsed, "Sampler", "sampler_name", "sampler");
+    const cfg = pick(lastParsed, "CFG scale", "cfg_scale");
+    const seed = pick(lastParsed, "Seed", "seed");
+    const size = pick(lastParsed, "Size", "size");
+
+    if (prompt) document.getElementById("prompt").value = prompt;
+    if (negative) document.getElementById("negative_prompt").value = negative;
+    if (steps) {
+      stepsInput.value = steps;
+      stepsVal.textContent = steps;
+    }
+    if (cfg) {
+      cfgInput.value = cfg;
+      cfgVal.textContent = cfg;
+    }
+    if (seed) document.getElementById("seed").value = seed;
+
+    if (size && typeof size === "string" && size.includes("x")) {
+      const [w, h] = size.split("x").map((n) => n.trim());
+      const widthSelect = document.getElementById("width");
+      const heightSelect = document.getElementById("height");
+      if ([...widthSelect.options].some((o) => o.value === w)) widthSelect.value = w;
+      if ([...heightSelect.options].some((o) => o.value === h)) heightSelect.value = h;
+    }
+
+    if (sampler) {
+      const opt = [...samplerSelect.options].find(
+        (o) => o.value.toLowerCase() === String(sampler).toLowerCase()
+      );
+      if (opt) samplerSelect.value = opt.value;
+    }
+
+    showStatus("โหลดค่าจาก PNG Info มาใส่ในฟอร์มแล้ว เลื่อนขึ้นไปกด \"สร้างภาพ\" ได้เลย");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 });

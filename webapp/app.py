@@ -70,6 +70,7 @@ def init_db():
             height INTEGER,
             sampler TEXT,
             seed INTEGER,
+            checkpoint TEXT,
             image_path TEXT NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (id)
@@ -81,6 +82,12 @@ def init_db():
     existing_cols = [row["name"] for row in conn.execute("PRAGMA table_info(users)")]
     if "is_admin" not in existing_cols:
         conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+
+    # --- migration: เผื่อฐานข้อมูลเก่าที่สร้างมาก่อนมีคอลัมน์ checkpoint ---
+    existing_gen_cols = [row["name"] for row in conn.execute("PRAGMA table_info(generations)")]
+    if "checkpoint" not in existing_gen_cols:
+        conn.execute("ALTER TABLE generations ADD COLUMN checkpoint TEXT")
         conn.commit()
 
     # ถ้ายังไม่มี admin เลยสักคน ให้ยกคนที่สมัครสมาชิกไว้ก่อนใครเป็น admin อัตโนมัติ
@@ -297,6 +304,70 @@ def api_samplers():
 
 
 # ============================================================
+#  API: checkpoints (รายชื่อโมเดล/checkpoint ที่มีในเครื่อง AI Server)
+# ============================================================
+@app.route("/api/checkpoints")
+@login_required
+def api_checkpoints():
+    try:
+        resp = requests.get(
+            f"{FORGE_API_URL}/sdapi/v1/sd-models",
+            auth=(FORGE_API_USER, FORGE_API_PASS),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        # title คือค่าที่ต้องใช้ตอนสั่งสลับ checkpoint ผ่าน API
+        # model_name คือชื่อที่อ่านง่ายกว่า เอาไว้โชว์ใน dropdown
+        checkpoints = [
+            {"title": m["title"], "model_name": m.get("model_name", m["title"])}
+            for m in resp.json()
+        ]
+        return jsonify(checkpoints)
+    except requests.exceptions.RequestException:
+        return jsonify([])  # ให้ frontend รู้ว่าดึงไม่ได้ แล้วซ่อน dropdown นี้ไป
+
+
+# ============================================================
+#  API: png-info (อ่าน prompt/ค่าตั้งค่าที่ฝังอยู่ในไฟล์ PNG)
+# ============================================================
+@app.route("/api/png-info", methods=["POST"])
+@login_required
+def api_png_info():
+    uploaded = request.files.get("image")
+    if not uploaded or uploaded.filename == "":
+        return jsonify({"error": "กรุณาเลือกไฟล์ภาพ"}), 400
+
+    raw_bytes = uploaded.read()
+    if not raw_bytes:
+        return jsonify({"error": "ไฟล์ภาพว่างเปล่าหรืออ่านไม่ได้"}), 400
+
+    b64_image = "data:image/png;base64," + base64.b64encode(raw_bytes).decode()
+
+    try:
+        resp = requests.post(
+            f"{FORGE_API_URL}/sdapi/v1/png-info",
+            json={"image": b64_image},
+            auth=(FORGE_API_USER, FORGE_API_PASS),
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"เชื่อมต่อ AI Server ไม่ได้: {e}"}), 502
+
+    result = resp.json()
+    info_text = result.get("info") or ""
+    if not info_text.strip():
+        return jsonify({"error": "ไฟล์นี้ไม่มีข้อมูล generation ฝังอยู่ (อาจไม่ใช่ภาพที่สร้างจาก Stable Diffusion)"}), 422
+
+    parsed = result.get("parameters") or {}
+
+    return jsonify({
+        "info": info_text,      # ข้อความดิบทั้งหมด เผื่ออยากโชว์แบบเต็ม ๆ
+        "parameters": parsed,   # dict ที่ parse มาให้แล้ว เช่น prompt/steps/cfg_scale/seed
+    })
+
+
+# ============================================================
 #  API: generate (text-to-image)
 # ============================================================
 @app.route("/api/generate", methods=["POST"])
@@ -310,6 +381,7 @@ def api_generate():
 
     negative_prompt = data.get("negative_prompt", "")
     sampler = data.get("sampler") or "Euler a"
+    checkpoint = (data.get("checkpoint") or "").strip()  # ค่าว่าง = ใช้ checkpoint ที่โหลดอยู่ตอนนี้
 
     try:
         steps = int(data.get("steps", 20))
@@ -342,6 +414,14 @@ def api_generate():
         "do_not_save_grid": True,
     }
 
+    if checkpoint:
+        # สั่งสลับ checkpoint ก่อน generate — ถ้าเป็น checkpoint เดียวกับที่โหลดอยู่แล้ว
+        # Forge จะข้ามขั้นตอนโหลดใหม่ให้เอง ไม่ได้ช้าซ้ำทุกครั้ง
+        # restore_afterwards=False เพื่อให้ checkpoint นี้ค้างเป็นค่าปัจจุบันต่อไป
+        # (ไม่ต้องสลับกลับไปกลับมาทุก request ซึ่งจะช้ามาก)
+        payload["override_settings"] = {"sd_model_checkpoint": checkpoint}
+        payload["override_settings_restore_afterwards"] = False
+
     try:
         resp = requests.post(
             f"{FORGE_API_URL}/sdapi/v1/txt2img",
@@ -362,12 +442,16 @@ def api_generate():
     # แต่ค่า seed จริงที่ใช้ไปจะอยู่ใน field "info" (เป็น JSON string) แทน
     # ต้อง parse ตรงนี้เพื่อเอาค่าจริงมาเก็บ ไม่งั้นในฐานข้อมูล/หน้า admin จะเห็นแต่ -1 ตลอด
     actual_seed = seed
+    actual_checkpoint = checkpoint or None
     try:
         info = json.loads(result.get("info") or "{}")
         if info.get("seed") is not None:
             actual_seed = info["seed"]
+        # ถ้าไม่ได้เลือก checkpoint เอง ให้ลองอ่านชื่อโมเดลที่ Forge ใช้จริงกลับมาแทน
+        if not actual_checkpoint and info.get("sd_model_name"):
+            actual_checkpoint = info["sd_model_name"]
     except (ValueError, TypeError):
-        pass  # ถ้า parse ไม่ได้ ก็ fallback ไปใช้ค่า seed ที่ผู้ใช้ส่งมาแทน
+        pass  # ถ้า parse ไม่ได้ ก็ fallback ไปใช้ค่าที่มีอยู่แล้วแทน
 
     image_bytes = base64.b64decode(images[0])
     filename = f"{current_user.id}_{int(time.time() * 1000)}.png"
@@ -378,10 +462,10 @@ def api_generate():
     conn = get_db()
     conn.execute(
         """INSERT INTO generations
-           (user_id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed, image_path, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (user_id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed, checkpoint, image_path, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (current_user.id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, actual_seed,
-         f"outputs/{filename}", datetime.utcnow().isoformat()),
+         actual_checkpoint, f"outputs/{filename}", datetime.utcnow().isoformat()),
     )
     conn.commit()
     conn.close()
