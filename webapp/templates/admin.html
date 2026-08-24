@@ -33,6 +33,12 @@
         <span>Seed: {{ r['seed'] }}</span>
       </div>
       <div class="admin-timestamp">{{ r['created_at'] }}</div>
+
+      <form method="POST" action="{{ url_for('admin_delete', record_id=r['id']) }}"
+            class="admin-delete-form"
+            onsubmit="return confirm('ลบรายการนี้ถาวร? (ลบทั้ง record และไฟล์ภาพ กู้คืนไม่ได้)');">
+        <button type="submit" class="btn-danger">ลบรายการนี้</button>
+      </form>
     </div>
   </div>
   {% else %}

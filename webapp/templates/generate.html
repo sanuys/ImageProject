@@ -82,6 +82,7 @@
     <div class="history-item">
       <img src="{{ url_for('static', filename=item['image_path']) }}" alt="{{ item['prompt'] }}">
       <p title="{{ item['prompt'] }}">{{ item['prompt'] }}</p>
+      <p class="history-seed">Seed: {{ item['seed'] }}</p>
     </div>
     {% else %}
     <p class="placeholder-text">ยังไม่มีประวัติการสร้างภาพ</p>

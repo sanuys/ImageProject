@@ -40,13 +40,17 @@ document.addEventListener("DOMContentLoaded", () => {
     statusBox.style.display = "none";
   }
 
-  function prependHistory(imageUrl, prompt) {
+  function prependHistory(imageUrl, prompt, seed) {
     const placeholder = historyGrid.querySelector(".placeholder-text");
     if (placeholder) placeholder.remove();
 
     const item = document.createElement("div");
     item.className = "history-item";
-    item.innerHTML = `<img src="${imageUrl}" alt="${prompt}"><p title="${prompt}">${prompt}</p>`;
+    item.innerHTML = `
+      <img src="${imageUrl}" alt="${prompt}">
+      <p title="${prompt}">${prompt}</p>
+      <p class="history-seed">Seed: ${seed}</p>
+    `;
     historyGrid.prepend(item);
   }
 
@@ -81,9 +85,24 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      resultArea.innerHTML = `<img src="${data.image_url}" alt="${data.prompt}">`;
-      prependHistory(data.image_url, data.prompt);
+      resultArea.innerHTML = `
+        <div class="result-wrap">
+          <img src="${data.image_url}" alt="${data.prompt}">
+          <div class="seed-row">
+            <span>Seed ที่ใช้จริง: <strong>${data.seed}</strong></span>
+            <button type="button" id="reuse-seed-btn" class="btn-small">ใช้ seed นี้อีกครั้ง</button>
+          </div>
+        </div>
+      `;
+      prependHistory(data.image_url, data.prompt, data.seed);
       hideStatus();
+
+      const reuseBtn = document.getElementById("reuse-seed-btn");
+      if (reuseBtn) {
+        reuseBtn.addEventListener("click", () => {
+          document.getElementById("seed").value = data.seed;
+        });
+      }
     } catch (err) {
       showStatus("เชื่อมต่อ server ไม่ได้: " + err.message, true);
     } finally {

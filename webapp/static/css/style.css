@@ -144,6 +144,31 @@ input[type="range"] { width: 100%; margin-top: 6px; }
 }
 .result-area img { max-width: 100%; border-radius: 8px; }
 
+.result-wrap { width: 100%; text-align: center; }
+
+.seed-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.seed-row strong { color: var(--text); }
+
+.btn-small {
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.btn-small:hover { background: rgba(79, 140, 255, 0.12); }
+
 .placeholder-text { color: var(--muted); font-size: 0.9rem; text-align: center; }
 
 .history-grid {
@@ -160,12 +185,18 @@ input[type="range"] { width: 100%; margin-top: 6px; }
 .history-item img { width: 100%; display: block; aspect-ratio: 1 / 1; object-fit: cover; }
 .history-item p {
   margin: 0;
-  padding: 8px;
+  padding: 8px 8px 0 8px;
   font-size: 0.75rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.history-item p.history-seed {
+  padding: 2px 8px 8px 8px;
+  font-size: 0.7rem;
+  opacity: 0.8;
 }
 
 /* ---------- Admin page ---------- */
@@ -243,3 +274,17 @@ input[type="range"] { width: 100%; margin-top: 6px; }
   font-size: 0.72rem;
   color: var(--muted);
 }
+
+.admin-delete-form { margin-top: 10px; }
+
+.btn-danger {
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.btn-danger:hover { background: rgba(255, 92, 92, 0.12); }

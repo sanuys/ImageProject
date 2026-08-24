@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import base64
 import sqlite3
@@ -15,7 +16,7 @@ from flask_login import (
 # ============================================================
 #  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
 # ============================================================
-FORGE_API_URL = "http://10.141.1.225:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
+FORGE_API_URL = "http://172.20.57.72:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
 FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
 FORGE_API_PASS = "cdti1234"
 
@@ -241,6 +242,40 @@ def admin():
     )
 
 
+@app.route("/admin/delete/<int:record_id>", methods=["POST"])
+@login_required
+def admin_delete(record_id):
+    if not current_user.is_admin:
+        flash("หน้านี้สำหรับ admin เท่านั้น", "error")
+        return redirect(url_for("index"))
+
+    conn = get_db()
+    record = conn.execute(
+        "SELECT * FROM generations WHERE id = ?", (record_id,)
+    ).fetchone()
+
+    if not record:
+        conn.close()
+        flash("ไม่พบรายการนี้ (อาจถูกลบไปแล้ว)", "error")
+        return redirect(url_for("admin"))
+
+    # ลบไฟล์ภาพออกจากดิสก์ด้วย ไม่ใช่แค่ลบ record ใน DB
+    # (image_path ที่เก็บไว้เป็นรูปแบบ "outputs/xxx.png" ซึ่งอยู่ใต้โฟลเดอร์ static/)
+    image_full_path = os.path.join(BASE_DIR, "static", record["image_path"])
+    if os.path.isfile(image_full_path):
+        try:
+            os.remove(image_full_path)
+        except OSError:
+            pass  # ลบไฟล์ไม่สำเร็จก็ไม่เป็นไร อย่างน้อย record ใน DB ต้องลบได้
+
+    conn.execute("DELETE FROM generations WHERE id = ?", (record_id,))
+    conn.commit()
+    conn.close()
+
+    flash("ลบรายการนี้แล้ว", "success")
+    return redirect(url_for("admin"))
+
+
 # ============================================================
 #  API: samplers (สำหรับทำ dropdown ให้เหมือนใน Forge)
 # ============================================================
@@ -323,6 +358,17 @@ def api_generate():
     if not images:
         return jsonify({"error": "AI Server ไม่ได้ส่งภาพกลับมา"}), 502
 
+    # ตอนขอ seed = -1 (สุ่ม) Forge จะไม่ส่ง seed กลับมาใน "images"
+    # แต่ค่า seed จริงที่ใช้ไปจะอยู่ใน field "info" (เป็น JSON string) แทน
+    # ต้อง parse ตรงนี้เพื่อเอาค่าจริงมาเก็บ ไม่งั้นในฐานข้อมูล/หน้า admin จะเห็นแต่ -1 ตลอด
+    actual_seed = seed
+    try:
+        info = json.loads(result.get("info") or "{}")
+        if info.get("seed") is not None:
+            actual_seed = info["seed"]
+    except (ValueError, TypeError):
+        pass  # ถ้า parse ไม่ได้ ก็ fallback ไปใช้ค่า seed ที่ผู้ใช้ส่งมาแทน
+
     image_bytes = base64.b64decode(images[0])
     filename = f"{current_user.id}_{int(time.time() * 1000)}.png"
     filepath = os.path.join(OUTPUT_DIR, filename)
@@ -334,7 +380,7 @@ def api_generate():
         """INSERT INTO generations
            (user_id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed, image_path, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (current_user.id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed,
+        (current_user.id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, actual_seed,
          f"outputs/{filename}", datetime.utcnow().isoformat()),
     )
     conn.commit()
@@ -343,6 +389,7 @@ def api_generate():
     return jsonify({
         "image_url": url_for("static", filename=f"outputs/{filename}"),
         "prompt": prompt,
+        "seed": actual_seed,
     })
 
 
