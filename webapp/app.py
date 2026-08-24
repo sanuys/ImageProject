@@ -16,7 +16,7 @@ from flask_login import (
 # ============================================================
 #  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
 # ============================================================
-FORGE_API_URL = "http://172.20.57.72:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
+FORGE_API_URL = "http://192.168.1.185:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
 FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
 FORGE_API_PASS = "cdti1234"
 

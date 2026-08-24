@@ -69,7 +69,69 @@ body {
 .switch-link a { color: var(--accent); }
 
 /* ---------- Form elements ---------- */
-label { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Tooltip (ไอคอน ⓘ ข้าง label) ---------- */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: help;
+  position: relative;
+  flex-shrink: 0;
+}
+.info-icon:hover,
+.info-icon:focus {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.info-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  width: max-content;
+  max-width: 260px;
+  background: #10121a;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.info-icon:hover::after,
+.info-icon:focus::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
 
 input[type="text"], input[type="password"], input[type="number"],
 textarea, select {

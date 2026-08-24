@@ -7,26 +7,46 @@
   <div class="panel">
     <h2>Text to Image</h2>
     <form id="generate-form">
-      <label for="prompt">Prompt</label>
+      <label for="prompt">
+        Prompt
+        <span class="info-icon" tabindex="0"
+              data-tooltip="คำอธิบายภาพที่ต้องการให้ AI สร้าง ยิ่งเขียนละเอียดยิ่งได้ภาพตรงใจ เช่น ระบุสี ท่าทาง มุมกล้อง สไตล์ภาพ (คั่นด้วยลูกน้ำได้)">ⓘ</span>
+      </label>
       <textarea id="prompt" name="prompt" rows="3" placeholder="อธิบายภาพที่ต้องการ เช่น a cat sitting on a chair, digital art" required></textarea>
 
-      <label for="negative_prompt">Negative Prompt</label>
+      <label for="negative_prompt">
+        Negative Prompt
+        <span class="info-icon" tabindex="0"
+              data-tooltip="สิ่งที่ไม่อยากให้ปรากฏในภาพ ช่วยลดข้อผิดพลาดที่พบบ่อย เช่น มือผิดรูป, ภาพเบลอ, คุณภาพต่ำ — ปล่อยว่างไว้ได้ถ้าไม่ต้องการ">ⓘ</span>
+      </label>
       <textarea id="negative_prompt" name="negative_prompt" rows="2" placeholder="สิ่งที่ไม่อยากให้มีในภาพ เช่น blurry, low quality"></textarea>
 
       <div class="row">
         <div class="field">
-          <label for="steps">Steps <span id="steps-val">20</span></label>
+          <label for="steps">
+            Steps <span id="steps-val">20</span>
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="จำนวนรอบที่ AI ใช้ค่อย ๆ วาดภาพจาก noise ยิ่งมากยิ่งละเอียดขึ้นแต่ใช้เวลานานขึ้น ค่าที่นิยมใช้คือ 20-30">ⓘ</span>
+          </label>
           <input type="range" id="steps" name="steps" min="1" max="50" value="20">
         </div>
         <div class="field">
-          <label for="cfg_scale">CFG Scale <span id="cfg-val">7</span></label>
+          <label for="cfg_scale">
+            CFG Scale <span id="cfg-val">7</span>
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="ควบคุมว่า AI จะทำตาม prompt เคร่งครัดแค่ไหน ค่าสูง = ตาม prompt เป๊ะแต่ภาพอาจดูฝืน ค่าต่ำ = AI สร้างสรรค์อิสระมากขึ้น ค่าที่นิยมใช้คือ 5-10">ⓘ</span>
+          </label>
           <input type="range" id="cfg_scale" name="cfg_scale" min="1" max="30" step="0.5" value="7">
         </div>
       </div>
 
       <div class="row">
         <div class="field">
-          <label for="width">Width</label>
+          <label for="width">
+            Width
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="ความกว้างของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
+          </label>
           <select id="width" name="width">
             <option value="384">384</option>
             <option value="512" selected>512</option>
@@ -36,7 +56,11 @@
           </select>
         </div>
         <div class="field">
-          <label for="height">Height</label>
+          <label for="height">
+            Height
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="ความสูงของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
+          </label>
           <select id="height" name="height">
             <option value="384">384</option>
             <option value="512" selected>512</option>
@@ -49,13 +73,21 @@
 
       <div class="row">
         <div class="field">
-          <label for="sampler">Sampler</label>
+          <label for="sampler">
+            Sampler
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="อัลกอริทึมที่ใช้ค่อย ๆ แปลง noise ให้กลายเป็นภาพ แต่ละแบบให้ลายเส้น/ความเร็วต่างกันเล็กน้อย ถ้าไม่แน่ใจใช้ Euler a หรือ DPM++ 2M ได้เลย">ⓘ</span>
+          </label>
           <select id="sampler" name="sampler">
             <option value="Euler a">Euler a</option>
           </select>
         </div>
         <div class="field">
-          <label for="seed">Seed (-1 = สุ่ม)</label>
+          <label for="seed">
+            Seed (-1 = สุ่ม)
+            <span class="info-icon" tabindex="0"
+                  data-tooltip="เลขตั้งต้นของการสุ่ม ถ้าใช้ prompt เดิม + ค่าตั้งค่าเดิม + seed เดิม จะได้ภาพซ้ำเดิมทุกครั้ง ใส่ -1 เพื่อให้สุ่ม seed ใหม่ทุกครั้งที่กดสร้างภาพ">ⓘ</span>
+          </label>
           <input type="number" id="seed" name="seed" value="-1">
         </div>
       </div>
