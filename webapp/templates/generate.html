@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}สร้างภาพ{% endblock %}
+{% block content %}
+
+<div class="generate-layout">
+
+  <div class="panel">
+    <h2>Text to Image</h2>
+    <form id="generate-form">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" name="prompt" rows="3" placeholder="อธิบายภาพที่ต้องการ เช่น a cat sitting on a chair, digital art" required></textarea>
+
+      <label for="negative_prompt">Negative Prompt</label>
+      <textarea id="negative_prompt" name="negative_prompt" rows="2" placeholder="สิ่งที่ไม่อยากให้มีในภาพ เช่น blurry, low quality"></textarea>
+
+      <div class="row">
+        <div class="field">
+          <label for="steps">Steps <span id="steps-val">20</span></label>
+          <input type="range" id="steps" name="steps" min="1" max="50" value="20">
+        </div>
+        <div class="field">
+          <label for="cfg_scale">CFG Scale <span id="cfg-val">7</span></label>
+          <input type="range" id="cfg_scale" name="cfg_scale" min="1" max="30" step="0.5" value="7">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="width">Width</label>
+          <select id="width" name="width">
+            <option value="384">384</option>
+            <option value="512" selected>512</option>
+            <option value="640">640</option>
+            <option value="768">768</option>
+            <option value="1024">1024</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="height">Height</label>
+          <select id="height" name="height">
+            <option value="384">384</option>
+            <option value="512" selected>512</option>
+            <option value="640">640</option>
+            <option value="768">768</option>
+            <option value="1024">1024</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="sampler">Sampler</label>
+          <select id="sampler" name="sampler">
+            <option value="Euler a">Euler a</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="seed">Seed (-1 = สุ่ม)</label>
+          <input type="number" id="seed" name="seed" value="-1">
+        </div>
+      </div>
+
+      <button type="submit" id="generate-btn" class="btn-primary">สร้างภาพ</button>
+    </form>
+
+    <div id="status-box" class="status-box" style="display:none;"></div>
+  </div>
+
+  <div class="panel result-panel">
+    <h2>ผลลัพธ์</h2>
+    <div id="result-area" class="result-area">
+      <p class="placeholder-text">ยังไม่มีภาพ — กรอกฟอร์มด้านซ้ายแล้วกด "สร้างภาพ"</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel history-panel">
+  <h2>ประวัติของฉัน</h2>
+  <div id="history-grid" class="history-grid">
+    {% for item in history %}
+    <div class="history-item">
+      <img src="{{ url_for('static', filename=item['image_path']) }}" alt="{{ item['prompt'] }}">
+      <p title="{{ item['prompt'] }}">{{ item['prompt'] }}</p>
+    </div>
+    {% else %}
+    <p class="placeholder-text">ยังไม่มีประวัติการสร้างภาพ</p>
+    {% endfor %}
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

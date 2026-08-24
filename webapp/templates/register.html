@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}สมัครสมาชิก{% endblock %}
+{% block content %}
+<div class="auth-box">
+  <h2>สมัครสมาชิก</h2>
+  <form method="POST">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required autofocus>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+
+    <label for="confirm">ยืนยัน Password</label>
+    <input type="password" id="confirm" name="confirm" required>
+
+    <button type="submit" class="btn-primary">สมัครสมาชิก</button>
+  </form>
+  <p class="switch-link">มีบัญชีอยู่แล้ว? <a href="{{ url_for('login') }}">เข้าสู่ระบบ</a></p>
+</div>
+{% endblock %}

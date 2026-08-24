@@ -1,0 +1,293 @@
+import os
+import time
+import base64
+import sqlite3
+from datetime import datetime
+
+import requests
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user,
+    login_required, current_user,
+)
+
+# ============================================================
+#  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
+# ============================================================
+FORGE_API_URL = "http://172.20.57.72:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
+FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
+FORGE_API_PASS = "cdti1234"
+
+SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เปลี่ยนก่อนใช้งานจริง
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
+OUTPUT_DIR = os.path.join(BASE_DIR, "static", "outputs")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ============================================================
+#  APP SETUP
+# ============================================================
+app = Flask(__name__)
+app.secret_key = SECRET_KEY
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.login_message = "กรุณาเข้าสู่ระบบก่อนใช้งาน"
+login_manager.login_message_category = "error"
+
+
+# ---------- DB helpers ----------
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS generations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            prompt TEXT NOT NULL,
+            negative_prompt TEXT,
+            steps INTEGER,
+            cfg_scale REAL,
+            width INTEGER,
+            height INTEGER,
+            sampler TEXT,
+            seed INTEGER,
+            image_path TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+# ---------- Flask-Login user model ----------
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db()
+    row = conn.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if row:
+        return User(row["id"], row["username"])
+    return None
+
+
+# ============================================================
+#  AUTH ROUTES
+# ============================================================
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+
+        if not username or not password:
+            flash("กรุณากรอก username และ password ให้ครบ", "error")
+            return redirect(url_for("register"))
+        if len(password) < 4:
+            flash("password ต้องยาวอย่างน้อย 4 ตัวอักษร", "error")
+            return redirect(url_for("register"))
+        if password != confirm:
+            flash("รหัสผ่านทั้งสองช่องไม่ตรงกัน", "error")
+            return redirect(url_for("register"))
+
+        conn = get_db()
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            conn.close()
+            flash("username นี้มีคนใช้แล้ว", "error")
+            return redirect(url_for("register"))
+
+        conn.execute(
+            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+            (username, generate_password_hash(password), datetime.utcnow().isoformat()),
+        )
+        conn.commit()
+        conn.close()
+        flash("สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ", "success")
+        return redirect(url_for("login"))
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        conn = get_db()
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        conn.close()
+
+        if row and check_password_hash(row["password_hash"], password):
+            login_user(User(row["id"], row["username"]))
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("index"))
+
+        flash("username หรือ password ไม่ถูกต้อง", "error")
+        return redirect(url_for("login"))
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
+
+# ============================================================
+#  MAIN PAGE
+# ============================================================
+@app.route("/")
+@login_required
+def index():
+    conn = get_db()
+    history = conn.execute(
+        "SELECT * FROM generations WHERE user_id = ? ORDER BY id DESC LIMIT 24",
+        (current_user.id,),
+    ).fetchall()
+    conn.close()
+    return render_template("generate.html", history=history)
+
+
+# ============================================================
+#  API: samplers (สำหรับทำ dropdown ให้เหมือนใน Forge)
+# ============================================================
+@app.route("/api/samplers")
+@login_required
+def api_samplers():
+    try:
+        resp = requests.get(
+            f"{FORGE_API_URL}/sdapi/v1/samplers",
+            auth=(FORGE_API_USER, FORGE_API_PASS),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        names = [s["name"] for s in resp.json()]
+        return jsonify(names)
+    except requests.exceptions.RequestException:
+        # เผื่อ AI Server ต่อไม่ติดตอนโหลดหน้า ให้ fallback เป็นค่าที่พบบ่อย
+        return jsonify(["Euler a", "Euler", "DPM++ 2M", "DPM++ SDE", "DPM++ 2M Karras"])
+
+
+# ============================================================
+#  API: generate (text-to-image)
+# ============================================================
+@app.route("/api/generate", methods=["POST"])
+@login_required
+def api_generate():
+    data = request.get_json(force=True, silent=True) or {}
+
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "กรุณากรอก prompt"}), 400
+
+    negative_prompt = data.get("negative_prompt", "")
+    sampler = data.get("sampler") or "Euler a"
+
+    try:
+        steps = int(data.get("steps", 20))
+        cfg_scale = float(data.get("cfg_scale", 7))
+        width = int(data.get("width", 512))
+        height = int(data.get("height", 512))
+        seed = int(data.get("seed", -1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "ค่าพารามิเตอร์ไม่ถูกต้อง"}), 400
+
+    # กันค่าที่มากเกินไปจนเครื่อง AI Server ค้างนาน/พังได้
+    steps = max(1, min(steps, 50))
+    cfg_scale = max(1, min(cfg_scale, 30))
+    width = max(64, min(width, 1024))
+    height = max(64, min(height, 1024))
+
+    payload = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "steps": steps,
+        "cfg_scale": cfg_scale,
+        "width": width,
+        "height": height,
+        "sampler_name": sampler,
+        "seed": seed,
+        "batch_size": 1,
+        # ไม่ต้องให้ Forge เซฟไฟล์ซ้ำไว้ในเครื่อง AI Server เอง
+        # เพราะเว็บเราจะเซฟภาพ + บันทึกลง SQLite ของตัวเองอยู่แล้ว
+        "do_not_save_samples": True,
+        "do_not_save_grid": True,
+    }
+
+    try:
+        resp = requests.post(
+            f"{FORGE_API_URL}/sdapi/v1/txt2img",
+            json=payload,
+            auth=(FORGE_API_USER, FORGE_API_PASS),
+            timeout=300,  # generate อาจใช้เวลานาน ต้องกันไม่ให้ timeout เร็วเกินไป
+        )
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"เชื่อมต่อ AI Server ไม่ได้: {e}"}), 502
+
+    result = resp.json()
+    images = result.get("images") or []
+    if not images:
+        return jsonify({"error": "AI Server ไม่ได้ส่งภาพกลับมา"}), 502
+
+    image_bytes = base64.b64decode(images[0])
+    filename = f"{current_user.id}_{int(time.time() * 1000)}.png"
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(image_bytes)
+
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO generations
+           (user_id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed, image_path, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (current_user.id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed,
+         f"outputs/{filename}", datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "image_url": url_for("static", filename=f"outputs/{filename}"),
+        "prompt": prompt,
+    })
+
+
+if __name__ == "__main__":
+    init_db()
+    # host="0.0.0.0" เพื่อให้เครื่องอื่นในวง LAN (เช่นเครื่อง Nginx / Frontend) ยิงเข้ามาได้
+    app.run(host="0.0.0.0", port=5000, debug=True)
