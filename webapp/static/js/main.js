@@ -32,6 +32,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (opt.dataset.height && [...heightSelect.options].some((o) => o.value === opt.dataset.height)) {
       heightSelect.value = opt.dataset.height;
     }
+
+    // steps/cfg เป็น optional — ใส่เฉพาะ checkpoint ที่กำหนดค่าแนะนำไว้จริง (ไม่งั้นไม่ไปยุ่งกับค่าเดิม)
+    if (opt.dataset.steps) {
+      stepsInput.value = opt.dataset.steps;
+      stepsVal.textContent = opt.dataset.steps;
+    }
+    if (opt.dataset.cfgScale) {
+      cfgInput.value = opt.dataset.cfgScale;
+      cfgVal.textContent = opt.dataset.cfgScale;
+    }
   }
 
   checkpointSelect.addEventListener("change", applyCheckpointPreset);
@@ -75,6 +85,8 @@ document.addEventListener("DOMContentLoaded", () => {
             opt.dataset.sampler = cp.sampler || "";
             opt.dataset.width = cp.width || "";
             opt.dataset.height = cp.height || "";
+            opt.dataset.steps = cp.steps || "";
+            opt.dataset.cfgScale = cp.cfg_scale || "";
             checkpointSelect.appendChild(opt);
           });
 

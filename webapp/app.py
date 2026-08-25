@@ -24,10 +24,12 @@ SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เป
 
 # รายชื่อ checkpoint ที่อนุญาตให้เลือกในหน้าเว็บ (จำกัดไว้แค่ 2 ตัวนี้ตามที่ตั้งไว้จริงในเครื่อง AI Server)
 # "match" คือ substring ที่ใช้เทียบกับ model_name/title ที่ Forge ส่งมา (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
-# ส่วน sampler/width/height คือค่า default ที่จะเติมให้อัตโนมัติเมื่อเลือก checkpoint ตัวนั้น
+# sampler/width/height/steps/cfg_scale คือค่า default ที่จะเติมให้อัตโนมัติเมื่อเลือก checkpoint ตัวนั้น
+# (ถ้า checkpoint ไหนไม่ใส่ steps/cfg_scale ไว้ จะไม่ไปยุ่งกับค่าที่ผู้ใช้ตั้งอยู่ในฟอร์ม)
 ALLOWED_CHECKPOINTS = [
     {"match": "realSimpleAnime", "sampler": "Euler a", "width": 1024, "height": 1024},
-    {"match": "realismIllustriousBy", "sampler": "Res Multistep", "width": 1024, "height": 1024},
+    {"match": "realismIllustriousBy", "sampler": "Res Multistep", "width": 1024, "height": 1024,
+     "steps": 27, "cfg_scale": 5},
 ]
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -346,6 +348,8 @@ def api_checkpoints():
                     "sampler": preset["sampler"],
                     "width": preset["width"],
                     "height": preset["height"],
+                    "steps": preset.get("steps"),          # None ถ้า checkpoint นี้ไม่ได้กำหนดไว้
+                    "cfg_scale": preset.get("cfg_scale"),  # None ถ้า checkpoint นี้ไม่ได้กำหนดไว้
                 })
 
         return jsonify(checkpoints)
