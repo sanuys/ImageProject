@@ -22,6 +22,14 @@ FORGE_API_PASS = "cdti1234"
 
 SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เปลี่ยนก่อนใช้งานจริง
 
+# รายชื่อ checkpoint ที่อนุญาตให้เลือกในหน้าเว็บ (จำกัดไว้แค่ 2 ตัวนี้ตามที่ตั้งไว้จริงในเครื่อง AI Server)
+# "match" คือ substring ที่ใช้เทียบกับ model_name/title ที่ Forge ส่งมา (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
+# ส่วน sampler/width/height คือค่า default ที่จะเติมให้อัตโนมัติเมื่อเลือก checkpoint ตัวนั้น
+ALLOWED_CHECKPOINTS = [
+    {"match": "realSimpleAnime", "sampler": "Euler a", "width": 1024, "height": 1024},
+    {"match": "realismIllustriousBy", "sampler": "Res Multistep", "width": 1024, "height": 1024},
+]
+
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 OUTPUT_DIR = os.path.join(BASE_DIR, "static", "outputs")
@@ -316,12 +324,30 @@ def api_checkpoints():
             timeout=10,
         )
         resp.raise_for_status()
-        # title คือค่าที่ต้องใช้ตอนสั่งสลับ checkpoint ผ่าน API
-        # model_name คือชื่อที่อ่านง่ายกว่า เอาไว้โชว์ใน dropdown
-        checkpoints = [
-            {"title": m["title"], "model_name": m.get("model_name", m["title"])}
-            for m in resp.json()
-        ]
+
+        # กรองเหลือเฉพาะ checkpoint ที่อยู่ใน allow-list (ALLOWED_CHECKPOINTS ด้านบน)
+        # แล้วแนบค่า preset (sampler/width/height) ที่ควรใช้กับ checkpoint นั้นไปด้วย
+        # เทียบ title จริงจาก Forge กับ "match" เพื่อไม่ต้องเดา/ hardcode ชื่อไฟล์แบบเป๊ะ ๆ เอง
+        checkpoints = []
+        for m in resp.json():
+            title = m["title"]
+            model_name = m.get("model_name", title)
+            preset = next(
+                (
+                    p for p in ALLOWED_CHECKPOINTS
+                    if p["match"].lower() in title.lower() or p["match"].lower() in model_name.lower()
+                ),
+                None,
+            )
+            if preset:
+                checkpoints.append({
+                    "title": title,            # ค่าที่ต้องใช้ตอนสั่งสลับ checkpoint ผ่าน API
+                    "model_name": model_name,  # ชื่อที่อ่านง่ายกว่า เอาไว้โชว์ใน dropdown
+                    "sampler": preset["sampler"],
+                    "width": preset["width"],
+                    "height": preset["height"],
+                })
+
         return jsonify(checkpoints)
     except requests.exceptions.RequestException:
         return jsonify([])  # ให้ frontend รู้ว่าดึงไม่ได้ แล้วซ่อน dropdown นี้ไป

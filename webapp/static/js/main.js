@@ -15,7 +15,29 @@ document.addEventListener("DOMContentLoaded", () => {
   stepsInput.addEventListener("input", () => (stepsVal.textContent = stepsInput.value));
   cfgInput.addEventListener("input", () => (cfgVal.textContent = cfgInput.value));
 
-  // โหลดรายชื่อ sampler จริงจาก Forge มาใส่ dropdown
+  // พอเลือก checkpoint ใหม่ (หรือหลังโหลด dropdown เสร็จครั้งแรก) ให้ปรับ sampler/ความละเอียด
+  // ตาม preset ที่แนะนำของ checkpoint นั้นให้อัตโนมัติ
+  function applyCheckpointPreset() {
+    const opt = checkpointSelect.options[checkpointSelect.selectedIndex];
+    if (!opt || !opt.dataset.sampler) return; // ไม่มีตัวเลือกอยู่เลย หรือไม่มี preset ก็ไม่ต้องทำอะไร
+
+    const samplerOpt = [...samplerSelect.options].find((o) => o.value === opt.dataset.sampler);
+    if (samplerOpt) samplerSelect.value = opt.dataset.sampler;
+
+    const widthSelect = document.getElementById("width");
+    const heightSelect = document.getElementById("height");
+    if (opt.dataset.width && [...widthSelect.options].some((o) => o.value === opt.dataset.width)) {
+      widthSelect.value = opt.dataset.width;
+    }
+    if (opt.dataset.height && [...heightSelect.options].some((o) => o.value === opt.dataset.height)) {
+      heightSelect.value = opt.dataset.height;
+    }
+  }
+
+  checkpointSelect.addEventListener("change", applyCheckpointPreset);
+
+  // โหลด sampler ก่อน แล้วค่อยโหลด checkpoint ตาม เพื่อให้ dropdown sampler มีตัวเลือกครบ
+  // ก่อนที่จะลองเซ็ต sampler ตาม preset ของ checkpoint ตัวแรกที่ถูกเลือกไว้อัตโนมัติ
   fetch("/api/samplers")
     .then((r) => r.json())
     .then((names) => {
@@ -29,22 +51,44 @@ document.addEventListener("DOMContentLoaded", () => {
     })
     .catch(() => {
       // เงียบไว้ ใช้ค่า default "Euler a" ที่มีอยู่แล้วในหน้า
-    });
-
-  // โหลดรายชื่อ checkpoint จริงจาก Forge มาใส่ dropdown
-  // (ถ้าดึงไม่ได้/ไม่มี ก็เหลือแค่ตัวเลือก "ใช้ checkpoint ที่โหลดอยู่ตอนนี้" ไว้เฉย ๆ ไม่พัง)
-  fetch("/api/checkpoints")
-    .then((r) => r.json())
-    .then((checkpoints) => {
-      checkpoints.forEach((cp) => {
-        const opt = document.createElement("option");
-        opt.value = cp.title;
-        opt.textContent = cp.model_name;
-        checkpointSelect.appendChild(opt);
-      });
     })
-    .catch(() => {
-      // เงียบไว้ เหลือแค่ตัวเลือก default
+    .finally(() => {
+      // โหลดรายชื่อ checkpoint จริงจาก Forge มาใส่ dropdown (ถูกกรองไว้แค่ 2 ตัวที่อนุญาตแล้วจากฝั่ง backend)
+      fetch("/api/checkpoints")
+        .then((r) => r.json())
+        .then((checkpoints) => {
+          if (!checkpoints || checkpoints.length === 0) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "(โหลดรายชื่อ checkpoint ไม่สำเร็จ ลองรีเฟรชหน้า)";
+            opt.disabled = true;
+            checkpointSelect.appendChild(opt);
+            return;
+          }
+
+          checkpoints.forEach((cp) => {
+            const opt = document.createElement("option");
+            opt.value = cp.title;
+            opt.textContent = cp.model_name;
+            // เก็บ preset (sampler/width/height) ที่แนะนำไว้กับตัว <option> เอง
+            // ไว้ให้ applyCheckpointPreset() หยิบไปเติมฟอร์มอัตโนมัติ
+            opt.dataset.sampler = cp.sampler || "";
+            opt.dataset.width = cp.width || "";
+            opt.dataset.height = cp.height || "";
+            checkpointSelect.appendChild(opt);
+          });
+
+          // checkpoint ตัวแรกในลิสต์ถูกเลือกเป็นค่าเริ่มต้นโดย browser อยู่แล้ว
+          // เติม sampler/ความละเอียดให้ตรงกับ preset ของมันทันที ไม่ต้องรอผู้ใช้กดเปลี่ยนเอง
+          applyCheckpointPreset();
+        })
+        .catch(() => {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "(โหลดรายชื่อ checkpoint ไม่สำเร็จ ลองรีเฟรชหน้า)";
+          opt.disabled = true;
+          checkpointSelect.appendChild(opt);
+        });
     });
 
   function showStatus(message, isError = false) {
