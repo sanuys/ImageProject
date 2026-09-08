@@ -2,165 +2,334 @@
 {% block title %}สร้างภาพ{% endblock %}
 {% block content %}
 
-<div class="generate-layout">
+<div class="tabs-nav">
+  <button type="button" class="tab-btn" data-tab="generate">สร้างภาพ</button>
+  <button type="button" class="tab-btn" data-tab="edit">แก้ไขภาพ</button>
+  <button type="button" class="tab-btn" data-tab="pnginfo">PNG Info</button>
+</div>
+
+<!-- ============================================================ -->
+<!--  TAB 1: สร้างภาพ (Text to Image)                              -->
+<!-- ============================================================ -->
+<div id="tab-generate" class="tab-panel">
+
+  <div class="generate-layout">
+
+    <div class="panel">
+      <h2>Text to Image</h2>
+      <form id="generate-form">
+        <label for="prompt">
+          Prompt
+          <span class="info-icon" tabindex="0"
+                data-tooltip="คำอธิบายภาพที่ต้องการให้ AI สร้าง ยิ่งเขียนละเอียดยิ่งได้ภาพตรงใจ เช่น ระบุสี ท่าทาง มุมกล้อง สไตล์ภาพ (คั่นด้วยลูกน้ำได้)">ⓘ</span>
+        </label>
+        <textarea id="prompt" name="prompt" rows="3" placeholder="อธิบายภาพที่ต้องการ เช่น a cat sitting on a chair, digital art" required></textarea>
+
+        <label for="negative_prompt">
+          Negative Prompt
+          <span class="info-icon" tabindex="0"
+                data-tooltip="สิ่งที่ไม่อยากให้ปรากฏในภาพ ช่วยลดข้อผิดพลาดที่พบบ่อย เช่น มือผิดรูป, ภาพเบลอ, คุณภาพต่ำ — ปล่อยว่างไว้ได้ถ้าไม่ต้องการ">ⓘ</span>
+        </label>
+        <textarea id="negative_prompt" name="negative_prompt" rows="2" placeholder="สิ่งที่ไม่อยากให้มีในภาพ เช่น blurry, low quality"></textarea>
+
+        <div class="row">
+          <div class="field">
+            <label for="steps">
+              Steps <span id="steps-val">20</span>
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="จำนวนรอบที่ AI ใช้ค่อย ๆ วาดภาพจาก noise ยิ่งมากยิ่งละเอียดขึ้นแต่ใช้เวลานานขึ้น ค่าที่นิยมใช้คือ 20-30">ⓘ</span>
+            </label>
+            <input type="range" id="steps" name="steps" min="1" max="50" value="20">
+          </div>
+          <div class="field">
+            <label for="cfg_scale">
+              CFG Scale <span id="cfg-val">7</span>
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ควบคุมว่า AI จะทำตาม prompt เคร่งครัดแค่ไหน ค่าสูง = ตาม prompt เป๊ะแต่ภาพอาจดูฝืน ค่าต่ำ = AI สร้างสรรค์อิสระมากขึ้น ค่าที่นิยมใช้คือ 5-10">ⓘ</span>
+            </label>
+            <input type="range" id="cfg_scale" name="cfg_scale" min="1" max="30" step="0.5" value="7">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="width">
+              Width
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ความกว้างของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
+            </label>
+            <select id="width" name="width">
+              <option value="384">384</option>
+              <option value="512" selected>512</option>
+              <option value="640">640</option>
+              <option value="768">768</option>
+              <option value="1024">1024</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="height">
+              Height
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ความสูงของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
+            </label>
+            <select id="height" name="height">
+              <option value="384">384</option>
+              <option value="512" selected>512</option>
+              <option value="640">640</option>
+              <option value="768">768</option>
+              <option value="1024">1024</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field field-full">
+            <label for="checkpoint">
+              Checkpoint
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="โมเดล/checkpoint ที่จะใช้สร้างภาพ สลับ checkpoint ครั้งแรกจะช้าเพราะต้องโหลดโมเดลใหม่ (อาจ 30-60 วินาที) ครั้งต่อไปที่ใช้ checkpoint เดิมจะเร็วขึ้นมาก">ⓘ</span>
+            </label>
+            <select id="checkpoint" name="checkpoint">
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="sampler">
+              Sampler
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="อัลกอริทึมที่ใช้ค่อย ๆ แปลง noise ให้กลายเป็นภาพ แต่ละแบบให้ลายเส้น/ความเร็วต่างกันเล็กน้อย ถ้าไม่แน่ใจใช้ Euler a หรือ DPM++ 2M ได้เลย">ⓘ</span>
+            </label>
+            <select id="sampler" name="sampler">
+              <option value="Euler a">Euler a</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="seed">
+              Seed (-1 = สุ่ม)
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="เลขตั้งต้นของการสุ่ม ถ้าใช้ prompt เดิม + ค่าตั้งค่าเดิม + seed เดิม จะได้ภาพซ้ำเดิมทุกครั้ง ใส่ -1 เพื่อให้สุ่ม seed ใหม่ทุกครั้งที่กดสร้างภาพ">ⓘ</span>
+            </label>
+            <input type="number" id="seed" name="seed" value="-1">
+          </div>
+        </div>
+
+        <button type="submit" id="generate-btn" class="btn-primary">สร้างภาพ</button>
+      </form>
+
+      <div id="status-box" class="status-box" style="display:none;"></div>
+    </div>
+
+    <div class="panel result-panel">
+      <h2>ผลลัพธ์</h2>
+      <div id="result-area" class="result-area">
+        <p class="placeholder-text">ยังไม่มีภาพ — กรอกฟอร์มด้านซ้ายแล้วกด "สร้างภาพ"</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel history-panel">
+    <h2>ประวัติของฉัน</h2>
+    <div id="history-grid" class="history-grid">
+      {% for item in history %}
+      <div class="history-item">
+        <img src="{{ url_for('static', filename=item['image_path']) }}" alt="{{ item['prompt'] }}">
+        <p title="{{ item['prompt'] }}">{{ item['prompt'] }}</p>
+        <p class="history-seed">Seed: {{ item['seed'] }}</p>
+      </div>
+      {% else %}
+      <p class="placeholder-text">ยังไม่มีประวัติการสร้างภาพ</p>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!--  TAB 2: แก้ไขภาพ (Image Editing)                              -->
+<!-- ============================================================ -->
+<div id="tab-edit" class="tab-panel">
+
+  <div class="generate-layout">
+
+    <div class="panel">
+      <h2>แก้ไขภาพ</h2>
+
+      <label>
+        ภาพต้นฉบับ
+        <span class="info-icon" tabindex="0"
+              data-tooltip="เลือกภาพที่จะนำมาแก้ไข จะอัปโหลดไฟล์ใหม่ หรือหยิบจากภาพที่เคยสร้างไว้ในแท็บ 'สร้างภาพ' ก็ได้">ⓘ</span>
+      </label>
+      <div class="edit-source-tabs">
+        <button type="button" class="source-tab-btn active" data-source="upload">อัปโหลดภาพ</button>
+        <button type="button" class="source-tab-btn" data-source="history">เลือกจากภาพที่เคยสร้าง</button>
+      </div>
+
+      <div id="edit-source-upload" class="edit-source-panel active">
+        <div id="edit-dropzone" class="dropzone">
+          <p>ลากไฟล์ภาพมาวางที่นี่ หรือ <span class="dropzone-link">คลิกเพื่อเลือกไฟล์</span></p>
+          <input type="file" id="edit-file" accept="image/*" hidden>
+        </div>
+      </div>
+
+      <div id="edit-source-history" class="edit-source-panel">
+        <div id="edit-history-picker" class="history-picker">
+          {% for item in history %}
+          <img src="{{ url_for('static', filename=item['image_path']) }}"
+               class="history-picker-item" data-id="{{ item['id'] }}"
+               title="{{ item['prompt'] }}" alt="{{ item['prompt'] }}">
+          {% else %}
+          <p class="placeholder-text">ยังไม่มีภาพที่เคยสร้างไว้ ลองสร้างภาพในแท็บ "สร้างภาพ" ก่อน</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="edit-preview-box" class="edit-preview-box" style="display:none;">
+        <img id="edit-preview-img" alt="ภาพต้นฉบับที่เลือก">
+        <p id="edit-preview-label" class="placeholder-text"></p>
+      </div>
+
+      <label>
+        เลือกฟังก์ชันแก้ไข
+        <span class="info-icon" tabindex="0"
+              data-tooltip="ฟังก์ชัน Image Editing ทั้ง 4 นี้เป็น Point Operation / Fundamental Operation ตามวิชา Image Processing (310-3311) — คำนวณทีละพิกเซล ไม่มีขั้นตอนซับซ้อน">ⓘ</span>
+      </label>
+      <div class="op-tabs">
+        <button type="button" class="op-btn active" data-op="resize">Resize</button>
+        <button type="button" class="op-btn" data-op="grayscale">Grayscale</button>
+        <button type="button" class="op-btn" data-op="brightness_contrast">Brightness / Contrast</button>
+        <button type="button" class="op-btn" data-op="negative">Negative</button>
+      </div>
+
+      <div id="op-params-resize" class="op-params">
+        <div class="row">
+          <div class="field">
+            <label for="edit-width">
+              Width (px)
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ความกว้างใหม่ของภาพ — ภาพคืออาเรย์ตัวเลข (Rows x Cols) การ resize คือสร้างอาเรย์ขนาดใหม่แล้ว resample ค่าพิกเซลจากภาพเดิม (Lecture 3: Digital Image → Array)">ⓘ</span>
+            </label>
+            <input type="number" id="edit-width" min="16" max="4096" value="512">
+          </div>
+          <div class="field">
+            <label for="edit-height">
+              Height (px)
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ความสูงใหม่ของภาพ (พิกเซล)">ⓘ</span>
+            </label>
+            <input type="number" id="edit-height" min="16" max="4096" value="512">
+          </div>
+        </div>
+      </div>
+
+      <div id="op-params-grayscale" class="op-params" style="display:none;">
+        <p class="placeholder-text">
+          แปลงภาพสี (RGB 3 channel) ให้เหลือ 1 channel ความเข้มแสง (Lecture 3: Digital Image Grayscale/RGB)
+          — ไม่มีค่าที่ต้องตั้ง กด "แปลงภาพ" ได้เลย
+        </p>
+      </div>
+
+      <div id="op-params-brightness_contrast" class="op-params" style="display:none;">
+        <div class="row">
+          <div class="field">
+            <label for="edit-alpha">
+              Contrast (α) <span id="edit-alpha-val">1.0</span>
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ค่า α คูณความเข้มของทุกพิกเซล ตามสูตร g(x,y) = α·f(x,y) + β (Lecture 4: Point Operation) มากกว่า 1 = คอนทราสต์สูงขึ้น, น้อยกว่า 1 = ต่ำลง">ⓘ</span>
+            </label>
+            <input type="range" id="edit-alpha" min="0.1" max="3" step="0.1" value="1.0">
+          </div>
+          <div class="field">
+            <label for="edit-beta">
+              Brightness (β) <span id="edit-beta-val">0</span>
+              <span class="info-icon" tabindex="0"
+                    data-tooltip="ค่า β บวกเข้ากับทุกพิกเซล ค่าบวก = สว่างขึ้น, ค่าลบ = มืดลง ระบบจะ clamp ผลลัพธ์ไว้ในช่วง 0-255 ให้อัตโนมัติ (Lecture 4: Limiting the Results by Clamping)">ⓘ</span>
+            </label>
+            <input type="range" id="edit-beta" min="-100" max="100" step="1" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div id="op-params-negative" class="op-params" style="display:none;">
+        <p class="placeholder-text">
+          กลับค่าสีของทุกพิกเซล ตามสูตร s = (L−1) − r = 255 − r (Lecture 4: Point Operation, เส้น Negative)
+          — ไม่มีค่าที่ต้องตั้ง กด "แปลงภาพ" ได้เลย
+        </p>
+      </div>
+
+      <button type="button" id="edit-apply-btn" class="btn-primary">แปลงภาพ</button>
+      <div id="edit-status-box" class="status-box" style="display:none;"></div>
+    </div>
+
+    <div class="panel result-panel">
+      <h2>ผลลัพธ์</h2>
+      <div id="edit-result-area" class="result-area">
+        <p class="placeholder-text">ยังไม่มีภาพ — เลือกภาพต้นฉบับ เลือกฟังก์ชัน แล้วกด "แปลงภาพ"</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel history-panel">
+    <h2>ประวัติการแก้ไขของฉัน</h2>
+    <div id="edit-history-grid" class="history-grid">
+      {% for item in edit_history %}
+      <div class="history-item">
+        <img src="{{ url_for('static', filename=item['result_image']) }}" alt="{{ item['operation_label'] }}">
+        <p title="{{ item['operation_label'] }}">{{ item['operation_label'] }}</p>
+        {% if item['params_summary'] %}
+        <p class="history-seed">{{ item['params_summary'] }}</p>
+        {% endif %}
+        <form method="POST" action="{{ url_for('edit_delete', record_id=item['id']) }}"
+              class="admin-delete-form"
+              onsubmit="return confirm('ลบรายการนี้ถาวร?');">
+          <button type="submit" class="btn-danger">ลบ</button>
+        </form>
+      </div>
+      {% else %}
+      <p class="placeholder-text">ยังไม่มีประวัติการแก้ไขภาพ</p>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!--  TAB 3: PNG Info                                              -->
+<!-- ============================================================ -->
+<div id="tab-pnginfo" class="tab-panel">
 
   <div class="panel">
-    <h2>Text to Image</h2>
-    <form id="generate-form">
-      <label for="prompt">
-        Prompt
-        <span class="info-icon" tabindex="0"
-              data-tooltip="คำอธิบายภาพที่ต้องการให้ AI สร้าง ยิ่งเขียนละเอียดยิ่งได้ภาพตรงใจ เช่น ระบุสี ท่าทาง มุมกล้อง สไตล์ภาพ (คั่นด้วยลูกน้ำได้)">ⓘ</span>
-      </label>
-      <textarea id="prompt" name="prompt" rows="3" placeholder="อธิบายภาพที่ต้องการ เช่น a cat sitting on a chair, digital art" required></textarea>
+    <h2>
+      ตรวจสอบ PNG Info
+      <span class="info-icon" tabindex="0"
+            data-tooltip="อัปโหลดภาพที่สร้างจาก Stable Diffusion (ของระบบนี้หรือที่อื่นก็ได้) เพื่อดู prompt/ค่าตั้งค่าที่ฝังอยู่ในไฟล์ แล้วโหลดค่านั้นมาใช้สร้างภาพซ้ำได้ทันที">ⓘ</span>
+    </h2>
 
-      <label for="negative_prompt">
-        Negative Prompt
-        <span class="info-icon" tabindex="0"
-              data-tooltip="สิ่งที่ไม่อยากให้ปรากฏในภาพ ช่วยลดข้อผิดพลาดที่พบบ่อย เช่น มือผิดรูป, ภาพเบลอ, คุณภาพต่ำ — ปล่อยว่างไว้ได้ถ้าไม่ต้องการ">ⓘ</span>
-      </label>
-      <textarea id="negative_prompt" name="negative_prompt" rows="2" placeholder="สิ่งที่ไม่อยากให้มีในภาพ เช่น blurry, low quality"></textarea>
+    <div id="pnginfo-dropzone" class="dropzone">
+      <p>ลากไฟล์ PNG มาวางที่นี่ หรือ <span class="dropzone-link">คลิกเพื่อเลือกไฟล์</span></p>
+      <input type="file" id="pnginfo-file" accept="image/png" hidden>
+    </div>
 
-      <div class="row">
-        <div class="field">
-          <label for="steps">
-            Steps <span id="steps-val">20</span>
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="จำนวนรอบที่ AI ใช้ค่อย ๆ วาดภาพจาก noise ยิ่งมากยิ่งละเอียดขึ้นแต่ใช้เวลานานขึ้น ค่าที่นิยมใช้คือ 20-30">ⓘ</span>
-          </label>
-          <input type="range" id="steps" name="steps" min="1" max="50" value="20">
-        </div>
-        <div class="field">
-          <label for="cfg_scale">
-            CFG Scale <span id="cfg-val">7</span>
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="ควบคุมว่า AI จะทำตาม prompt เคร่งครัดแค่ไหน ค่าสูง = ตาม prompt เป๊ะแต่ภาพอาจดูฝืน ค่าต่ำ = AI สร้างสรรค์อิสระมากขึ้น ค่าที่นิยมใช้คือ 5-10">ⓘ</span>
-          </label>
-          <input type="range" id="cfg_scale" name="cfg_scale" min="1" max="30" step="0.5" value="7">
-        </div>
+    <div id="pnginfo-status" class="status-box" style="display:none;"></div>
+
+    <div id="pnginfo-result" class="pnginfo-result" style="display:none;">
+      <div class="pnginfo-preview">
+        <img id="pnginfo-preview-img" alt="ภาพที่อัปโหลด">
       </div>
-
-      <div class="row">
-        <div class="field">
-          <label for="width">
-            Width
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="ความกว้างของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
-          </label>
-          <select id="width" name="width">
-            <option value="384">384</option>
-            <option value="512" selected>512</option>
-            <option value="640">640</option>
-            <option value="768">768</option>
-            <option value="1024">1024</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="height">
-            Height
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="ความสูงของภาพ (พิกเซล) ยิ่งใหญ่ยิ่งใช้เวลาและ VRAM ของการ์ดจอมากขึ้น">ⓘ</span>
-          </label>
-          <select id="height" name="height">
-            <option value="384">384</option>
-            <option value="512" selected>512</option>
-            <option value="640">640</option>
-            <option value="768">768</option>
-            <option value="1024">1024</option>
-          </select>
-        </div>
+      <div class="pnginfo-details">
+        <div id="pnginfo-fields" class="admin-settings"></div>
+        <p class="admin-prompt"><strong>Prompt:</strong> <span id="pnginfo-prompt"></span></p>
+        <p class="admin-prompt admin-negative" id="pnginfo-negative-row">
+          <strong>Negative:</strong> <span id="pnginfo-negative"></span>
+        </p>
+        <button type="button" id="pnginfo-load-btn" class="btn-primary">ใช้ค่านี้สร้างภาพ</button>
       </div>
-
-      <div class="row">
-        <div class="field field-full">
-          <label for="checkpoint">
-            Checkpoint
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="โมเดล/checkpoint ที่จะใช้สร้างภาพ สลับ checkpoint ครั้งแรกจะช้าเพราะต้องโหลดโมเดลใหม่ (อาจ 30-60 วินาที) ครั้งต่อไปที่ใช้ checkpoint เดิมจะเร็วขึ้นมาก">ⓘ</span>
-          </label>
-          <select id="checkpoint" name="checkpoint">
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label for="sampler">
-            Sampler
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="อัลกอริทึมที่ใช้ค่อย ๆ แปลง noise ให้กลายเป็นภาพ แต่ละแบบให้ลายเส้น/ความเร็วต่างกันเล็กน้อย ถ้าไม่แน่ใจใช้ Euler a หรือ DPM++ 2M ได้เลย">ⓘ</span>
-          </label>
-          <select id="sampler" name="sampler">
-            <option value="Euler a">Euler a</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="seed">
-            Seed (-1 = สุ่ม)
-            <span class="info-icon" tabindex="0"
-                  data-tooltip="เลขตั้งต้นของการสุ่ม ถ้าใช้ prompt เดิม + ค่าตั้งค่าเดิม + seed เดิม จะได้ภาพซ้ำเดิมทุกครั้ง ใส่ -1 เพื่อให้สุ่ม seed ใหม่ทุกครั้งที่กดสร้างภาพ">ⓘ</span>
-          </label>
-          <input type="number" id="seed" name="seed" value="-1">
-        </div>
-      </div>
-
-      <button type="submit" id="generate-btn" class="btn-primary">สร้างภาพ</button>
-    </form>
-
-    <div id="status-box" class="status-box" style="display:none;"></div>
-  </div>
-
-  <div class="panel result-panel">
-    <h2>ผลลัพธ์</h2>
-    <div id="result-area" class="result-area">
-      <p class="placeholder-text">ยังไม่มีภาพ — กรอกฟอร์มด้านซ้ายแล้วกด "สร้างภาพ"</p>
     </div>
   </div>
 
-</div>
-
-<div class="panel">
-  <h2>
-    ตรวจสอบ PNG Info
-    <span class="info-icon" tabindex="0"
-          data-tooltip="อัปโหลดภาพที่สร้างจาก Stable Diffusion (ของระบบนี้หรือที่อื่นก็ได้) เพื่อดู prompt/ค่าตั้งค่าที่ฝังอยู่ในไฟล์ แล้วโหลดค่านั้นมาใช้สร้างภาพซ้ำได้ทันที">ⓘ</span>
-  </h2>
-
-  <div id="pnginfo-dropzone" class="dropzone">
-    <p>ลากไฟล์ PNG มาวางที่นี่ หรือ <span class="dropzone-link">คลิกเพื่อเลือกไฟล์</span></p>
-    <input type="file" id="pnginfo-file" accept="image/png" hidden>
-  </div>
-
-  <div id="pnginfo-status" class="status-box" style="display:none;"></div>
-
-  <div id="pnginfo-result" class="pnginfo-result" style="display:none;">
-    <div class="pnginfo-preview">
-      <img id="pnginfo-preview-img" alt="ภาพที่อัปโหลด">
-    </div>
-    <div class="pnginfo-details">
-      <div id="pnginfo-fields" class="admin-settings"></div>
-      <p class="admin-prompt"><strong>Prompt:</strong> <span id="pnginfo-prompt"></span></p>
-      <p class="admin-prompt admin-negative" id="pnginfo-negative-row">
-        <strong>Negative:</strong> <span id="pnginfo-negative"></span>
-      </p>
-      <button type="button" id="pnginfo-load-btn" class="btn-primary">ใช้ค่านี้สร้างภาพ</button>
-    </div>
-  </div>
-</div>
-
-<div class="panel history-panel">
-  <h2>ประวัติของฉัน</h2>
-  <div id="history-grid" class="history-grid">
-    {% for item in history %}
-    <div class="history-item">
-      <img src="{{ url_for('static', filename=item['image_path']) }}" alt="{{ item['prompt'] }}">
-      <p title="{{ item['prompt'] }}">{{ item['prompt'] }}</p>
-      <p class="history-seed">Seed: {{ item['seed'] }}</p>
-    </div>
-    {% else %}
-    <p class="placeholder-text">ยังไม่มีประวัติการสร้างภาพ</p>
-    {% endfor %}
-  </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>

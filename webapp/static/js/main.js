@@ -15,11 +15,38 @@ document.addEventListener("DOMContentLoaded", () => {
   stepsInput.addEventListener("input", () => (stepsVal.textContent = stepsInput.value));
   cfgInput.addEventListener("input", () => (cfgVal.textContent = cfgInput.value));
 
-  // พอเลือก checkpoint ใหม่ (หรือหลังโหลด dropdown เสร็จครั้งแรก) ให้ปรับ sampler/ความละเอียด
-  // ตาม preset ที่แนะนำของ checkpoint นั้นให้อัตโนมัติ
+  // ============================================================
+  //  Tabs: สร้างภาพ / แก้ไขภาพ / PNG Info
+  // ============================================================
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  const VALID_TABS = ["generate", "edit", "pnginfo"];
+
+  function showTab(name) {
+    if (!VALID_TABS.includes(name)) name = "generate";
+    tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+    tabPanels.forEach((p) => p.classList.toggle("active", p.id === "tab-" + name));
+  }
+
+  tabButtons.forEach((b) => {
+    b.addEventListener("click", () => {
+      showTab(b.dataset.tab);
+      history.replaceState(null, "", "#" + b.dataset.tab);
+    });
+  });
+
+  showTab((location.hash || "#generate").slice(1));
+
+  // ค่า fallback เผื่อ checkpoint ไหนไม่ได้กำหนด steps/cfg ไว้จากฝั่ง backend (ไม่ควรเกิดขึ้นแล้ว
+  // เพราะตอนนี้ตั้งไว้ครบทุกตัวใน ALLOWED_CHECKPOINTS แล้ว แต่กันไว้เผื่อเพิ่ม checkpoint ใหม่แล้วลืมใส่)
+  const DEFAULT_STEPS = "20";
+  const DEFAULT_CFG = "7";
+
+  // พอเลือก checkpoint ใหม่ (หรือหลังโหลด dropdown เสร็จครั้งแรก) ให้ปรับ sampler/ความละเอียด/steps/cfg
+  // ตาม preset ที่แนะนำของ checkpoint นั้น "ทุกครั้ง" ที่สลับ — ไม่ปล่อยให้ค้างค่าจาก checkpoint ก่อนหน้า
   function applyCheckpointPreset() {
     const opt = checkpointSelect.options[checkpointSelect.selectedIndex];
-    if (!opt || !opt.dataset.sampler) return; // ไม่มีตัวเลือกอยู่เลย หรือไม่มี preset ก็ไม่ต้องทำอะไร
+    if (!opt) return; // dropdown ยังไม่มีตัวเลือกเลย (เช่น กำลังโหลดอยู่)
 
     const samplerOpt = [...samplerSelect.options].find((o) => o.value === opt.dataset.sampler);
     if (samplerOpt) samplerSelect.value = opt.dataset.sampler;
@@ -33,15 +60,15 @@ document.addEventListener("DOMContentLoaded", () => {
       heightSelect.value = opt.dataset.height;
     }
 
-    // steps/cfg เป็น optional — ใส่เฉพาะ checkpoint ที่กำหนดค่าแนะนำไว้จริง (ไม่งั้นไม่ไปยุ่งกับค่าเดิม)
-    if (opt.dataset.steps) {
-      stepsInput.value = opt.dataset.steps;
-      stepsVal.textContent = opt.dataset.steps;
-    }
-    if (opt.dataset.cfgScale) {
-      cfgInput.value = opt.dataset.cfgScale;
-      cfgVal.textContent = opt.dataset.cfgScale;
-    }
+    // เซ็ต steps/cfg แบบไม่มีเงื่อนไขทุกครั้งที่สลับ checkpoint (ใช้ค่า fallback ถ้า checkpoint
+    // นั้นดันไม่ได้กำหนดไว้) เพื่อไม่ให้ค่าค้างจาก checkpoint ก่อนหน้าที่เพิ่งสลับออกไป
+    const steps = opt.dataset.steps || DEFAULT_STEPS;
+    stepsInput.value = steps;
+    stepsVal.textContent = steps;
+
+    const cfg = opt.dataset.cfgScale || DEFAULT_CFG;
+    cfgInput.value = cfg;
+    cfgVal.textContent = cfg;
   }
 
   checkpointSelect.addEventListener("change", applyCheckpointPreset);
@@ -68,11 +95,17 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((r) => r.json())
         .then((checkpoints) => {
           if (!checkpoints || checkpoints.length === 0) {
+            // หมายเหตุ: ตั้งใจไม่ใส่ opt.disabled = true เพราะถ้า option เดียวใน <select>
+            // เป็น disabled บางเบราว์เซอร์จะปฏิเสธไม่แสดงข้อความอะไรเลย (กล่องว่างเปล่า งงว่าเกิดอะไรขึ้น)
             const opt = document.createElement("option");
             opt.value = "";
-            opt.textContent = "(โหลดรายชื่อ checkpoint ไม่สำเร็จ ลองรีเฟรชหน้า)";
-            opt.disabled = true;
+            opt.textContent = "⚠ โหลด checkpoint ไม่สำเร็จ — รีเฟรชหน้านี้อีกครั้ง";
             checkpointSelect.appendChild(opt);
+            showStatus(
+              "โหลดรายชื่อ checkpoint จาก AI Server ไม่สำเร็จ (ได้ผลลัพธ์ว่างเปล่า) " +
+                "ตรวจสอบว่า Stability Matrix / Forge เปิดอยู่, ตั้ง --api ไว้แล้ว, และ IP/พอร์ตใน app.py ยังถูกต้อง จากนั้นรีเฟรชหน้านี้ใหม่",
+              true
+            );
             return;
           }
 
@@ -97,9 +130,12 @@ document.addEventListener("DOMContentLoaded", () => {
         .catch(() => {
           const opt = document.createElement("option");
           opt.value = "";
-          opt.textContent = "(โหลดรายชื่อ checkpoint ไม่สำเร็จ ลองรีเฟรชหน้า)";
-          opt.disabled = true;
+          opt.textContent = "⚠ โหลด checkpoint ไม่สำเร็จ — รีเฟรชหน้านี้อีกครั้ง";
           checkpointSelect.appendChild(opt);
+          showStatus(
+            "เชื่อมต่อเพื่อโหลดรายชื่อ checkpoint ไม่ได้ ตรวจสอบการเชื่อมต่อเครือข่ายหรือว่า Flask server ยังรันอยู่ แล้วรีเฟรชหน้านี้ใหม่",
+            true
+          );
         });
     });
 
@@ -113,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     statusBox.style.display = "none";
   }
 
-  function prependHistory(imageUrl, prompt, seed) {
+  function prependHistory(imageUrl, prompt, seed, generationId) {
     const placeholder = historyGrid.querySelector(".placeholder-text");
     if (placeholder) placeholder.remove();
 
@@ -125,6 +161,22 @@ document.addEventListener("DOMContentLoaded", () => {
       <p class="history-seed">Seed: ${seed}</p>
     `;
     historyGrid.prepend(item);
+
+    // เติมภาพนี้เข้า "เลือกจากภาพที่เคยสร้าง" ในแท็บแก้ไขภาพด้วย ไม่งั้นต้องรีเฟรชหน้าก่อน
+    // ถึงจะเอาภาพที่เพิ่งสร้างไปแก้ไขได้ (picker เดิมเรนเดอร์จาก server แค่ตอนโหลดหน้าครั้งแรก)
+    const picker = document.getElementById("edit-history-picker");
+    if (picker && generationId) {
+      const pickerPlaceholder = picker.querySelector(".placeholder-text");
+      if (pickerPlaceholder) pickerPlaceholder.remove();
+
+      const img = document.createElement("img");
+      img.src = imageUrl;
+      img.className = "history-picker-item";
+      img.dataset.id = generationId;
+      img.title = prompt;
+      img.alt = prompt;
+      picker.prepend(img);
+    }
   }
 
   form.addEventListener("submit", async (e) => {
@@ -168,7 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         </div>
       `;
-      prependHistory(data.image_url, data.prompt, data.seed);
+      prependHistory(data.image_url, data.prompt, data.seed, data.id);
       hideStatus();
 
       const reuseBtn = document.getElementById("reuse-seed-btn");
@@ -344,7 +396,204 @@ document.addEventListener("DOMContentLoaded", () => {
       if (opt) samplerSelect.value = opt.value;
     }
 
-    showStatus("โหลดค่าจาก PNG Info มาใส่ในฟอร์มแล้ว เลื่อนขึ้นไปกด \"สร้างภาพ\" ได้เลย");
+    showStatus("โหลดค่าจาก PNG Info มาใส่ในฟอร์มแล้ว กด \"สร้างภาพ\" ได้เลย");
+    showTab("generate");
+    history.replaceState(null, "", "#generate");
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
+
+  // ============================================================
+  //  แก้ไขภาพ (Image Editing): Resize / Grayscale / Brightness-Contrast / Negative
+  // ============================================================
+  const editSourceTabBtns = document.querySelectorAll(".source-tab-btn");
+  const editSourcePanels = document.querySelectorAll(".edit-source-panel");
+  const editDropzone = document.getElementById("edit-dropzone");
+  const editFileInput = document.getElementById("edit-file");
+  const editHistoryPicker = document.getElementById("edit-history-picker");
+  const editPreviewBox = document.getElementById("edit-preview-box");
+  const editPreviewImg = document.getElementById("edit-preview-img");
+  const editPreviewLabel = document.getElementById("edit-preview-label");
+  const opBtns = document.querySelectorAll(".op-btn");
+  const opParamsBoxes = document.querySelectorAll(".op-params");
+  const editAlphaInput = document.getElementById("edit-alpha");
+  const editAlphaVal = document.getElementById("edit-alpha-val");
+  const editBetaInput = document.getElementById("edit-beta");
+  const editBetaVal = document.getElementById("edit-beta-val");
+  const editApplyBtn = document.getElementById("edit-apply-btn");
+  const editStatusBox = document.getElementById("edit-status-box");
+  const editResultArea = document.getElementById("edit-result-area");
+  const editHistoryGrid = document.getElementById("edit-history-grid");
+
+  let editSourceMode = "upload"; // "upload" | "history"
+  let editSelectedFile = null;
+  let editSelectedGenerationId = null;
+  let currentOp = "resize";
+
+  // สลับระหว่าง "อัปโหลดภาพ" กับ "เลือกจากภาพที่เคยสร้าง"
+  editSourceTabBtns.forEach((b) => {
+    b.addEventListener("click", () => {
+      editSourceMode = b.dataset.source;
+      editSourceTabBtns.forEach((x) => x.classList.toggle("active", x === b));
+      editSourcePanels.forEach((p) =>
+        p.classList.toggle("active", p.id === "edit-source-" + editSourceMode)
+      );
+    });
+  });
+
+  function showEditStatus(message, isError = false) {
+    editStatusBox.style.display = "block";
+    editStatusBox.textContent = message;
+    editStatusBox.classList.toggle("error", isError);
+  }
+  function hideEditStatus() {
+    editStatusBox.style.display = "none";
+  }
+
+  function setEditPreview(src, label) {
+    editPreviewImg.src = src;
+    editPreviewLabel.textContent = label || "";
+    editPreviewBox.style.display = "block";
+  }
+
+  // --- แหล่งภาพ: อัปโหลดเอง ---
+  if (editDropzone) {
+    editDropzone.addEventListener("click", () => editFileInput.click());
+    editFileInput.addEventListener("change", () => {
+      const file = editFileInput.files[0];
+      if (!file) return;
+      editSelectedFile = file;
+      editSelectedGenerationId = null;
+      setEditPreview(URL.createObjectURL(file), `อัปโหลด: ${file.name}`);
+    });
+    ["dragover", "dragenter"].forEach((evt) =>
+      editDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        editDropzone.classList.add("dropzone-active");
+      })
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      editDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        editDropzone.classList.remove("dropzone-active");
+      })
+    );
+    editDropzone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+      editSelectedFile = file;
+      editSelectedGenerationId = null;
+      setEditPreview(URL.createObjectURL(file), `อัปโหลด: ${file.name}`);
+    });
+  }
+
+  // --- แหล่งภาพ: เลือกจากประวัติที่เคยสร้าง ---
+  if (editHistoryPicker) {
+    editHistoryPicker.addEventListener("click", (e) => {
+      const img = e.target.closest(".history-picker-item");
+      if (!img) return;
+      editSelectedGenerationId = img.dataset.id;
+      editSelectedFile = null;
+      editHistoryPicker
+        .querySelectorAll(".history-picker-item")
+        .forEach((el) => el.classList.toggle("selected", el === img));
+      setEditPreview(img.src, img.title ? `ภาพที่สร้างไว้: ${img.title}` : "ภาพที่เลือกจากประวัติ");
+    });
+  }
+
+  // --- เลือกฟังก์ชันแก้ไข ---
+  opBtns.forEach((b) => {
+    b.addEventListener("click", () => {
+      currentOp = b.dataset.op;
+      opBtns.forEach((x) => x.classList.toggle("active", x === b));
+      opParamsBoxes.forEach((p) => {
+        p.style.display = p.id === "op-params-" + currentOp ? "" : "none";
+      });
+    });
+  });
+
+  if (editAlphaInput) {
+    editAlphaInput.addEventListener("input", () => (editAlphaVal.textContent = editAlphaInput.value));
+  }
+  if (editBetaInput) {
+    editBetaInput.addEventListener("input", () => (editBetaVal.textContent = editBetaInput.value));
+  }
+
+  function prependEditHistory(imageUrl, operationLabel, paramsSummary, recordId) {
+    if (!editHistoryGrid) return;
+    const placeholder = editHistoryGrid.querySelector(".placeholder-text");
+    if (placeholder) placeholder.remove();
+
+    const item = document.createElement("div");
+    item.className = "history-item";
+    item.innerHTML = `
+      <img src="${imageUrl}" alt="${operationLabel}">
+      <p title="${operationLabel}">${operationLabel}</p>
+      ${paramsSummary ? `<p class="history-seed">${paramsSummary}</p>` : ""}
+      <form method="POST" action="/edit/delete/${recordId}" class="admin-delete-form"
+            onsubmit="return confirm('ลบรายการนี้ถาวร?');">
+        <button type="submit" class="btn-danger">ลบ</button>
+      </form>
+    `;
+    editHistoryGrid.prepend(item);
+  }
+
+  // --- กด "แปลงภาพ" ---
+  if (editApplyBtn) {
+    editApplyBtn.addEventListener("click", async () => {
+      if (editSourceMode === "upload" && !editSelectedFile) {
+        showEditStatus("กรุณาเลือกไฟล์ภาพที่จะอัปโหลดก่อน", true);
+        return;
+      }
+      if (editSourceMode === "history" && !editSelectedGenerationId) {
+        showEditStatus("กรุณาเลือกภาพจากประวัติก่อน", true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("operation", currentOp);
+      if (editSourceMode === "upload") {
+        formData.append("image", editSelectedFile);
+      } else {
+        formData.append("generation_id", editSelectedGenerationId);
+      }
+      if (currentOp === "resize") {
+        formData.append("width", document.getElementById("edit-width").value);
+        formData.append("height", document.getElementById("edit-height").value);
+      } else if (currentOp === "brightness_contrast") {
+        formData.append("alpha", editAlphaInput.value);
+        formData.append("beta", editBetaInput.value);
+      }
+
+      editApplyBtn.disabled = true;
+      editApplyBtn.textContent = "กำลังแปลงภาพ...";
+      showEditStatus("กำลังประมวลผล...");
+
+      try {
+        const res = await fetch("/api/edit", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showEditStatus(data.error || "แก้ไขภาพไม่สำเร็จ", true);
+          return;
+        }
+
+        editResultArea.innerHTML = `
+          <div class="result-wrap">
+            <img src="${data.image_url}" alt="${data.operation_label}">
+            <div class="seed-row">
+              <span><strong>${data.operation_label}</strong></span>
+              ${data.params_summary ? `<span>${data.params_summary}</span>` : ""}
+            </div>
+          </div>
+        `;
+        prependEditHistory(data.image_url, data.operation_label, data.params_summary, data.id);
+        hideEditStatus();
+      } catch (err) {
+        showEditStatus("เชื่อมต่อ server ไม่ได้: " + err.message, true);
+      } finally {
+        editApplyBtn.disabled = false;
+        editApplyBtn.textContent = "แปลงภาพ";
+      }
+    });
+  }
 });

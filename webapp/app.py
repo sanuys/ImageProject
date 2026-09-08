@@ -1,10 +1,13 @@
 import os
 import json
 import time
+import uuid
 import base64
 import sqlite3
 from datetime import datetime
 
+import cv2
+import numpy as np
 import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,7 +19,7 @@ from flask_login import (
 # ============================================================
 #  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
 # ============================================================
-FORGE_API_URL = "http://192.168.1.185:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
+FORGE_API_URL = "http://10.141.2.26:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
 FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
 FORGE_API_PASS = "cdti1234"
 
@@ -25,9 +28,11 @@ SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เป
 # รายชื่อ checkpoint ที่อนุญาตให้เลือกในหน้าเว็บ (จำกัดไว้แค่ 2 ตัวนี้ตามที่ตั้งไว้จริงในเครื่อง AI Server)
 # "match" คือ substring ที่ใช้เทียบกับ model_name/title ที่ Forge ส่งมา (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
 # sampler/width/height/steps/cfg_scale คือค่า default ที่จะเติมให้อัตโนมัติเมื่อเลือก checkpoint ตัวนั้น
-# (ถ้า checkpoint ไหนไม่ใส่ steps/cfg_scale ไว้ จะไม่ไปยุ่งกับค่าที่ผู้ใช้ตั้งอยู่ในฟอร์ม)
+# ทุก checkpoint ในลิสต์นี้ต้องระบุ steps/cfg_scale ไว้ครบ (ไม่งั้นตอนสลับ checkpoint ไป-มา
+# ค่าฝั่งหน้าเว็บจะค้างเป็นของ checkpoint ก่อนหน้า แทนที่จะอัปเดตตามตัวที่เพิ่งเลือกทุกครั้ง)
 ALLOWED_CHECKPOINTS = [
-    {"match": "realSimpleAnime", "sampler": "Euler a", "width": 1024, "height": 1024},
+    {"match": "realSimpleAnime", "sampler": "Euler a", "width": 1024, "height": 1024,
+     "steps": 20, "cfg_scale": 7},
     {"match": "realismIllustriousBy", "sampler": "Res Multistep", "width": 1024, "height": 1024,
      "steps": 27, "cfg_scale": 5},
 ]
@@ -36,6 +41,43 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 OUTPUT_DIR = os.path.join(BASE_DIR, "static", "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+EDIT_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "edits")
+os.makedirs(EDIT_OUTPUT_DIR, exist_ok=True)
+
+# ============================================================
+#  IMAGE EDITING — 4 ฟังก์ชัน Point Operation / Fundamental Operation
+#  (อ้างอิงจาก Lecture 3 - Human Visual Perception / Fundamental Operation
+#   และ Lecture 4 - Point Operation, วิชา 310-3311 Image Processing)
+#  รันอยู่ในเว็บ Flask นี้เลย เพราะเป็นการคำนวณ CPU เบาๆ ไม่ต้องพึ่ง GPU/AI Server
+# ============================================================
+OPERATION_LABELS = {
+    "resize": "ปรับขนาด (Resize)",
+    "grayscale": "ขาว-ดำ (Grayscale)",
+    "brightness_contrast": "ความสว่าง/คอนทราสต์ (Brightness/Contrast)",
+    "negative": "กลับสี (Negative)",
+}
+
+
+def _build_params_summary(operation, params):
+    """สรุปค่าพารามิเตอร์ที่ใช้แก้ไขภาพเป็นข้อความสั้นๆ ไว้โชว์ในประวัติ"""
+    if operation == "resize":
+        return f"{params.get('width', '?')} x {params.get('height', '?')} px"
+    if operation == "brightness_contrast":
+        return f"α (Contrast) = {params.get('alpha', '?')}, β (Brightness) = {params.get('beta', '?')}"
+    return ""
+
+
+def _edit_display_row(row):
+    """แปลง sqlite3.Row ของตาราง edits ให้เป็น dict พร้อม label/summary สำหรับแสดงผลใน template"""
+    d = dict(row)
+    try:
+        params = json.loads(d.get("params") or "{}")
+    except (ValueError, TypeError):
+        params = {}
+    d["operation_label"] = OPERATION_LABELS.get(d["operation"], d["operation"])
+    d["params_summary"] = _build_params_summary(d["operation"], params)
+    return d
 
 # ============================================================
 #  APP SETUP
@@ -82,6 +124,18 @@ def init_db():
             seed INTEGER,
             checkpoint TEXT,
             image_path TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS edits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            source_label TEXT,
+            operation TEXT NOT NULL,
+            params TEXT,
+            result_image TEXT NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
@@ -220,8 +274,13 @@ def index():
         "SELECT * FROM generations WHERE user_id = ? ORDER BY id DESC LIMIT 24",
         (current_user.id,),
     ).fetchall()
+    edit_rows = conn.execute(
+        "SELECT * FROM edits WHERE user_id = ? ORDER BY id DESC LIMIT 24",
+        (current_user.id,),
+    ).fetchall()
     conn.close()
-    return render_template("generate.html", history=history)
+    edit_history = [_edit_display_row(r) for r in edit_rows]
+    return render_template("generate.html", history=history, edit_history=edit_history)
 
 
 # ============================================================
@@ -490,7 +549,7 @@ def api_generate():
         f.write(image_bytes)
 
     conn = get_db()
-    conn.execute(
+    cursor = conn.execute(
         """INSERT INTO generations
            (user_id, prompt, negative_prompt, steps, cfg_scale, width, height, sampler, seed, checkpoint, image_path, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -498,13 +557,140 @@ def api_generate():
          actual_checkpoint, f"outputs/{filename}", datetime.utcnow().isoformat()),
     )
     conn.commit()
+    new_generation_id = cursor.lastrowid
     conn.close()
 
     return jsonify({
+        "id": new_generation_id,  # ใช้ตอนเพิ่มภาพนี้เข้าตัวเลือก "เลือกจากภาพที่เคยสร้าง" ในแท็บแก้ไขภาพแบบไม่ต้องรีเฟรชหน้า
         "image_url": url_for("static", filename=f"outputs/{filename}"),
         "prompt": prompt,
         "seed": actual_seed,
     })
+
+
+# ============================================================
+#  API: edit (Image Editing — Resize / Grayscale / Brightness-Contrast / Negative)
+#  รับภาพจาก 2 ทาง: อัปโหลดไฟล์เอง หรือเลือกจากภาพที่เคยสร้างไว้ (generation_id)
+# ============================================================
+@app.route("/api/edit", methods=["POST"])
+@login_required
+def api_edit():
+    operation = request.form.get("operation", "")
+    if operation not in OPERATION_LABELS:
+        return jsonify({"error": "ไม่รู้จักฟังก์ชันแก้ไขภาพนี้"}), 400
+
+    img = None
+    source_label = None
+
+    uploaded = request.files.get("image")
+    generation_id = request.form.get("generation_id")
+
+    if uploaded and uploaded.filename:
+        raw_bytes = uploaded.read()
+        if not raw_bytes:
+            return jsonify({"error": "ไฟล์ภาพว่างเปล่าหรืออ่านไม่ได้"}), 400
+        arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        source_label = f"อัปโหลด: {uploaded.filename}"
+    elif generation_id:
+        conn = get_db()
+        gen_row = conn.execute(
+            "SELECT * FROM generations WHERE id = ? AND user_id = ?",
+            (generation_id, current_user.id),
+        ).fetchone()
+        conn.close()
+        if not gen_row:
+            return jsonify({"error": "ไม่พบภาพที่เลือก หรือภาพนี้ไม่ใช่ของคุณ"}), 404
+        full_path = os.path.join(BASE_DIR, "static", gen_row["image_path"])
+        img = cv2.imread(full_path, cv2.IMREAD_COLOR)
+        source_label = f"ภาพที่สร้างไว้: {gen_row['prompt'][:40]}"
+    else:
+        return jsonify({"error": "กรุณาเลือกภาพต้นฉบับ (อัปโหลด หรือ เลือกจากประวัติ)"}), 400
+
+    if img is None:
+        return jsonify({"error": "อ่านภาพไม่สำเร็จ ไฟล์อาจเสียหายหรือไม่ใช่ไฟล์รูปภาพ"}), 400
+
+    params = {}
+    try:
+        if operation == "resize":
+            # Lecture 3 - Fundamental Operation: ภาพคือ Array (Rows x Cols)
+            # Resize = สร้างอาเรย์ใหม่ขนาดต่างไปจากเดิม แล้ว resample ค่า pixel (cv2 จัดการให้)
+            width = max(16, min(4096, int(request.form.get("width", 512))))
+            height = max(16, min(4096, int(request.form.get("height", 512))))
+            result = cv2.resize(img, (width, height), interpolation=cv2.INTER_LINEAR)
+            params = {"width": width, "height": height}
+
+        elif operation == "grayscale":
+            # Lecture 3 - Digital Image (RGB -> Grayscale): ยุบ 3 channel R/G/B เหลือ 1 channel
+            result = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            params = {}
+
+        elif operation == "brightness_contrast":
+            # Lecture 4 - Point Operation: g(x,y) = alpha * f(x,y) + beta แล้ว clamp ไว้ที่ 0-255
+            alpha = max(0.1, min(3.0, float(request.form.get("alpha", 1.0))))
+            beta = max(-100.0, min(100.0, float(request.form.get("beta", 0))))
+            result = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+            params = {"alpha": alpha, "beta": beta}
+
+        elif operation == "negative":
+            # Lecture 4 - Point Operation: s = (L-1) - r = 255 - r (L=256 สำหรับภาพ 8-bit)
+            result = cv2.bitwise_not(img)
+            params = {}
+    except (ValueError, TypeError, cv2.error) as e:
+        return jsonify({"error": f"แก้ไขภาพไม่สำเร็จ: {e}"}), 400
+
+    filename = f"edit_{current_user.id}_{uuid.uuid4().hex}.png"
+    save_path = os.path.join(EDIT_OUTPUT_DIR, filename)
+    cv2.imwrite(save_path, result)
+    relative_path = f"outputs/edits/{filename}"
+
+    conn = get_db()
+    cursor = conn.execute(
+        """INSERT INTO edits (user_id, source_label, operation, params, result_image, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (current_user.id, source_label, operation, json.dumps(params), relative_path,
+         datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+
+    return jsonify({
+        "id": new_id,
+        "image_url": url_for("static", filename=relative_path),
+        "operation": operation,
+        "operation_label": OPERATION_LABELS[operation],
+        "params_summary": _build_params_summary(operation, params),
+        "source_label": source_label,
+    })
+
+
+@app.route("/edit/delete/<int:record_id>", methods=["POST"])
+@login_required
+def edit_delete(record_id):
+    conn = get_db()
+    record = conn.execute(
+        "SELECT * FROM edits WHERE id = ? AND user_id = ?", (record_id, current_user.id)
+    ).fetchone()
+
+    if not record:
+        conn.close()
+        flash("ไม่พบรายการนี้ หรือไม่ใช่ของคุณ", "error")
+        return redirect(url_for("index"))
+
+    image_full_path = os.path.join(BASE_DIR, "static", record["result_image"])
+    if os.path.isfile(image_full_path):
+        try:
+            os.remove(image_full_path)
+        except OSError:
+            pass
+
+    conn.execute("DELETE FROM edits WHERE id = ?", (record_id,))
+    conn.commit()
+    conn.close()
+
+    flash("ลบรายการแก้ไขนี้แล้ว", "success")
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":

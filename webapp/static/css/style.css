@@ -164,6 +164,104 @@ input[type="range"] { width: 100%; margin-top: 6px; }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* ---------- Tabs (สร้างภาพ / แก้ไขภาพ / PNG Info) ---------- */
+.tabs-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---------- แก้ไขภาพ: เลือกแหล่งภาพ / เลือกฟังก์ชัน ---------- */
+.edit-source-tabs,
+.op-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 14px 0;
+}
+.source-tab-btn,
+.op-btn {
+  padding: 8px 14px;
+  background: #10121a;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.source-tab-btn:hover,
+.op-btn:hover { color: var(--text); border-color: var(--accent); }
+.source-tab-btn.active,
+.op-btn.active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.edit-source-panel { display: none; }
+.edit-source-panel.active { display: block; }
+
+.history-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+.history-picker-item {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.history-picker-item:hover { border-color: var(--accent); }
+.history-picker-item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.3); }
+
+.edit-preview-box {
+  margin: 14px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #10121a;
+}
+.edit-preview-box img {
+  max-width: 100%;
+  max-height: 220px;
+  display: block;
+  margin: 0 auto;
+  border-radius: 6px;
+}
+.edit-preview-box p { text-align: center; margin: 8px 0 0 0; }
+
+.op-params { margin-bottom: 6px; }
+
 /* ---------- Generate page layout ---------- */
 .generate-layout {
   display: grid;
