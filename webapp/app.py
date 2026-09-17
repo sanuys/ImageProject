@@ -3,27 +3,44 @@ import json
 import time
 import uuid
 import base64
+import logging
+import secrets
 import sqlite3
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 import cv2
 import numpy as np
 import requests
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user,
 )
 
-# ============================================================
-#  CONFIG — แก้ตรงนี้ให้ตรงกับเครื่อง AI Server จริงของทีมคุณ
-# ============================================================
-FORGE_API_URL = "http://10.141.2.26:7860"   # IP ของเครื่อง AI Server (Stability Matrix / Forge)
-FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ที่ตั้งไว้ใน Launch Options
-FORGE_API_PASS = "cdti1234"
+load_dotenv()
 
-SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เปลี่ยนก่อนใช้งานจริง
+# ============================================================
+#  CONFIG — อ่านจาก environment variables (.env) แทนการ hardcode
+#  ดู .env.example สำหรับรายการตัวแปรที่ต้องตั้งค่า
+# ============================================================
+FORGE_API_URL = os.environ.get("FORGE_API_URL", "http://127.0.0.1:7860")
+FORGE_API_USER = os.environ.get("FORGE_API_USER", "")
+FORGE_API_PASS = os.environ.get("FORGE_API_PASS", "")
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true"):
+        # เฉพาะตอน dev เท่านั้นที่ยอมให้สุ่มขึ้นมาเอง (session จะหลุดทุกครั้งที่ restart)
+        SECRET_KEY = secrets.token_hex(32)
+    else:
+        raise RuntimeError(
+            "SECRET_KEY ไม่ได้ตั้งค่าไว้ กรุณาสร้างไฟล์ .env จาก .env.example แล้วใส่ค่า SECRET_KEY "
+            "(สุ่มได้ด้วยคำสั่ง: python -c \"import secrets; print(secrets.token_hex(32))\")"
+        )
 
 # รายชื่อ checkpoint ที่อนุญาตให้เลือกในหน้าเว็บ (จำกัดไว้แค่ 2 ตัวนี้ตามที่ตั้งไว้จริงในเครื่อง AI Server)
 # "match" คือ substring ที่ใช้เทียบกับ model_name/title ที่ Forge ส่งมา (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
@@ -44,6 +61,9 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 EDIT_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "edits")
 os.makedirs(EDIT_OUTPUT_DIR, exist_ok=True)
+
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # ============================================================
 #  IMAGE EDITING — 4 ฟังก์ชัน Point Operation / Fundamental Operation
@@ -84,6 +104,26 @@ def _edit_display_row(row):
 # ============================================================
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+
+# ---------- Logging ----------
+# Backend role deliverable includes "Logging" — เขียนเป็นไฟล์แยกจาก console
+# หมุนไฟล์อัตโนมัติ (RotatingFileHandler) กันไฟล์ log บวมไม่มีที่สิ้นสุด
+log_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, "app.log"), maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+)
+log_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+))
+log_handler.setLevel(logging.INFO)
+app.logger.addHandler(log_handler)
+app.logger.setLevel(logging.INFO)
+
+# ---------- CORS ----------
+# เผื่อ frontend แยกออกไปเป็นคนละ origin/เครื่อง (ตาม Distributed System ใน project.pdf)
+# ALLOWED_ORIGINS ตั้งผ่าน .env เป็น comma-separated list เช่น "http://192.168.1.10"
+_allowed_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if _allowed_origins:
+    CORS(app, supports_credentials=True, origins=_allowed_origins)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -226,6 +266,7 @@ def register():
 
         conn.commit()
         conn.close()
+        app.logger.info("New user registered: %s (id=%s)", username, new_user_id)
         flash("สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ", "success")
         return redirect(url_for("login"))
 
@@ -247,9 +288,11 @@ def login():
 
         if row and check_password_hash(row["password_hash"], password):
             login_user(User(row["id"], row["username"], row["is_admin"]))
+            app.logger.info("Login success: %s (id=%s)", username, row["id"])
             next_page = request.args.get("next")
             return redirect(next_page or url_for("index"))
 
+        app.logger.warning("Login failed for username: %s", username)
         flash("username หรือ password ไม่ถูกต้อง", "error")
         return redirect(url_for("login"))
 
@@ -348,6 +391,7 @@ def admin_delete(record_id):
     conn.commit()
     conn.close()
 
+    app.logger.info("Admin %s deleted generation id=%s", current_user.username, record_id)
     flash("ลบรายการนี้แล้ว", "success")
     return redirect(url_for("admin"))
 
@@ -441,6 +485,7 @@ def api_png_info():
         )
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
+        app.logger.warning("AI Server unreachable (png-info): %s", e)
         return jsonify({"error": f"เชื่อมต่อ AI Server ไม่ได้: {e}"}), 502
 
     result = resp.json()
@@ -458,10 +503,22 @@ def api_png_info():
 
 # ============================================================
 #  API: generate (text-to-image)
+#  Rate-limited per user: กัน spam ยิงรัว ๆ ใส่ AI Server ที่ generate ทีละหลายสิบวินาที
 # ============================================================
+GENERATE_COOLDOWN_SECONDS = float(os.environ.get("GENERATE_COOLDOWN_SECONDS", 3))
+_last_generate_at = {}  # user_id -> unix timestamp ของ request ล่าสุดที่ผ่าน rate limit
+
+
 @app.route("/api/generate", methods=["POST"])
 @login_required
 def api_generate():
+    now = time.time()
+    last_at = _last_generate_at.get(current_user.id, 0)
+    if now - last_at < GENERATE_COOLDOWN_SECONDS:
+        wait = round(GENERATE_COOLDOWN_SECONDS - (now - last_at), 1)
+        return jsonify({"error": f"กรุณารอสักครู่ก่อนสร้างภาพใหม่ ({wait} วินาที)"}), 429
+    _last_generate_at[current_user.id] = now
+
     data = request.get_json(force=True, silent=True) or {}
 
     prompt = (data.get("prompt") or "").strip()
@@ -520,6 +577,7 @@ def api_generate():
         )
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
+        app.logger.warning("AI Server unreachable (generate): %s", e)
         return jsonify({"error": f"เชื่อมต่อ AI Server ไม่ได้: {e}"}), 502
 
     result = resp.json()
@@ -559,6 +617,11 @@ def api_generate():
     conn.commit()
     new_generation_id = cursor.lastrowid
     conn.close()
+
+    app.logger.info(
+        "Generation created: id=%s user=%s checkpoint=%s seed=%s",
+        new_generation_id, current_user.username, actual_checkpoint, actual_seed,
+    )
 
     return jsonify({
         "id": new_generation_id,  # ใช้ตอนเพิ่มภาพนี้เข้าตัวเลือก "เลือกจากภาพที่เคยสร้าง" ในแท็บแก้ไขภาพแบบไม่ต้องรีเฟรชหน้า
@@ -636,6 +699,10 @@ def api_edit():
             # Lecture 4 - Point Operation: s = (L-1) - r = 255 - r (L=256 สำหรับภาพ 8-bit)
             result = cv2.bitwise_not(img)
             params = {}
+        else:
+            # ไม่ควรเกิดขึ้นจริง เพราะเช็ค operation in OPERATION_LABELS ไว้แล้วด้านบน
+            # ใส่กันไว้เผื่อเพิ่ม key ใหม่ใน OPERATION_LABELS แล้วลืมเพิ่ม branch ที่นี่
+            return jsonify({"error": "ไม่รู้จักฟังก์ชันแก้ไขภาพนี้"}), 400
     except (ValueError, TypeError, cv2.error) as e:
         return jsonify({"error": f"แก้ไขภาพไม่สำเร็จ: {e}"}), 400
 
@@ -654,6 +721,8 @@ def api_edit():
     conn.commit()
     new_id = cursor.lastrowid
     conn.close()
+
+    app.logger.info("Edit created: id=%s user=%s operation=%s", new_id, current_user.username, operation)
 
     return jsonify({
         "id": new_id,
@@ -695,5 +764,6 @@ def edit_delete(record_id):
 
 if __name__ == "__main__":
     init_db()
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true")
     # host="0.0.0.0" เพื่อให้เครื่องอื่นในวง LAN (เช่นเครื่อง Nginx / Frontend) ยิงเข้ามาได้
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=debug)

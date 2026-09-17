@@ -147,6 +147,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# LUMA project: backup archives (scripts/backup.ps1 / backup.sh)
+/backups/
+
 # Environments
 .env
 .envrc
