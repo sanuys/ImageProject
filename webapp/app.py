@@ -27,7 +27,7 @@ load_dotenv()
 #  CONFIG — อ่านจาก environment variables (.env) แทนการ hardcode
 #  ดู .env.example สำหรับรายการตัวแปรที่ต้องตั้งค่า
 # ============================================================
-FORGE_API_URL = os.environ.get("FORGE_API_URL", "http://127.0.0.1:7860")
+FORGE_API_URL = os.environ.get("FORGE_API_URL", "http://172.20.56.112:7860")
 FORGE_API_USER = os.environ.get("FORGE_API_USER", "")
 FORGE_API_PASS = os.environ.get("FORGE_API_PASS", "")
 

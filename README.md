@@ -40,6 +40,11 @@ Full setup instructions: **[docs/setup.md](docs/setup.md)**.
 | Doc | Covers |
 |---|---|
 | [docs/setup.md](docs/setup.md) | Installing and running the backend, env vars, smoke tests |
+| [docs/RUN-TH.md](docs/RUN-TH.md) | คู่มือรันแบบเต็มระบบ (ภาษาไทย) |
+| [docs/run/backend.md](docs/run/backend.md) | วิธีรันฝั่ง Backend (ภาษาไทย) |
+| [docs/run/ai-server.md](docs/run/ai-server.md) | วิธีรันฝั่ง AI Server (ภาษาไทย) |
+| [docs/run/frontend.md](docs/run/frontend.md) | วิธีรันฝั่ง Frontend (ภาษาไทย) |
+| [docs/run/nginx.md](docs/run/nginx.md) | วิธีรันฝั่ง Nginx (ภาษาไทย) |
 | [docs/ai-server.md](docs/ai-server.md) | Setting up the Forge/Stability Matrix AI server |
 | [docs/backup.md](docs/backup.md) | Backing up/restoring the database and generated images |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | Changelog of what's been done + how to use each piece |
