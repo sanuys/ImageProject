@@ -147,6 +147,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# LUMA project: backup archives (scripts/backup.ps1 / backup.sh)
+/backups/
+
 # Environments
 .env
 .envrc
@@ -224,3 +227,9 @@ pc2-backend/storage/outputs/
 pc4-database/database.db
 # ฐานข้อมูล + ไฟล์ภาพของโหมดรันเครื่องเดียว
 single-pc/data/
+
+# Output Images
+*.png
+*.jpg
+*.jpeg
+*.gif
