@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <span class="brand">🖼️ Text-to-Image Studio</span>
+    <div class="nav-right" id="nav-right" style="display:none;"></div>
+  </nav>
+
+  <div class="container">
+    <div id="flash-area"></div>
+
+    <div class="auth-box">
+      <h2>เข้าสู่ระบบ</h2>
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit" class="btn-primary">เข้าสู่ระบบ</button>
+      </form>
+      <p class="switch-link">ยังไม่มีบัญชี? <a href="register.html">สมัครสมาชิก</a></p>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>
