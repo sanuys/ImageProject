@@ -1,6 +1,0 @@
-# PC2 : Backend (Flask) — ติดตั้งด้วย setup.bat
-Flask==3.0.3                        # เว็บเฟรมเวิร์กหลัก ทำ JSON API
-Flask-Login==0.6.3                  # ระบบ login / session / @login_required
-requests==2.32.3                    # ยิง HTTP ไปหา PC3 (Forge) และ PC4 (Database)
-opencv-python-headless==4.10.0.84   # แก้ไขภาพ 4 ฟังก์ชัน (headless = ไม่ต้องมี GUI)
-numpy==1.26.4                       # แปลง byte ของภาพเป็น array ให้ OpenCV
