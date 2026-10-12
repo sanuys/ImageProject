@@ -1,0 +1,3 @@
+# PC4 : Database Server — ติดตั้งด้วย setup.bat
+Flask==3.0.3   # ครอบ SQLite ให้เป็น HTTP service
+               # sqlite3 มากับ Python อยู่แล้ว ไม่ต้องลงเพิ่ม
