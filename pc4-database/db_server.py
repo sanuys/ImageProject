@@ -1,16 +1,18 @@
 """
 ============================================================
- PC4 : DATABASE SERVER   (10.187.226.35 : 5100)
+ PC4 : DATABASE SERVER   (172.20.56.108 : 5100)
 ------------------------------------------------------------
  โจทย์คือ "แยกฐานข้อมูลออกไปอยู่คนละเครื่องกับ Backend"
  แต่ SQLite เป็นไฟล์ local ไม่มีโปรโตคอลเครือข่ายในตัว
  (แชร์ไฟล์ .db ผ่าน SMB/network drive = ไฟล์พังง่ายมาก ห้ามทำ)
 
  วิธีที่ถูกต้องคือ ครอบ SQLite ด้วย "บริการเล็ก ๆ" ตัวนี้
- แล้วให้เครื่อง Backend (10.187.226.226) คุยผ่าน HTTP บน LAN แทน
+ แล้วให้เครื่อง Backend (172.20.56.107) คุยผ่าน HTTP บน LAN แทน
  -> ได้ Distributed System จริง: Backend ไม่แตะไฟล์ .db โดยตรงเลย
 
  เครื่องนี้เป็นเจ้าของไฟล์ database.db เพียงเครื่องเดียว
+ และเป็นที่เก็บไฟล์ภาพทั้งหมดของระบบด้วย (โฟลเดอร์ storage/ ข้าง ๆ database.db)
+ PC2 ส่งภาพมาเก็บ / ขอภาพไปแสดง / สั่งลบ ผ่าน /files/<path>
 ============================================================
 """
 
@@ -18,7 +20,8 @@ import os
 import sqlite3
 import threading
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+from werkzeug.utils import safe_join
 
 from schema import init_db
 
@@ -30,11 +33,15 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "database.db"))
 DB_PORT = int(os.environ.get("DB_PORT", "5100"))
 
+# ที่เก็บไฟล์ภาพ (ภาพที่สร้าง outputs/ และภาพที่แก้ไข outputs/edits/)
+# path ในฐานข้อมูลเป็นแบบ outputs/xxx.png ซึ่งนับจากโฟลเดอร์นี้
+STORAGE_DIR = os.environ.get("STORAGE_DIR", os.path.join(BASE_DIR, "storage"))
+
 # โทเคนลับ ต้องตรงกับค่า DB_TOKEN ใน pc2-backend/config.py
 DB_TOKEN = os.environ.get("DB_TOKEN", "cdti-db-secret-2026")
 
 # อนุญาตเฉพาะ IP ของเครื่อง Backend (และตัวเอง) — ใส่ set() ว่างเพื่อปิดการตรวจ IP
-ALLOWED_CLIENT_IPS = {"10.187.226.226", "127.0.0.1", "::1"}
+ALLOWED_CLIENT_IPS = {"172.20.56.107", "127.0.0.1", "::1"}
 
 app = Flask(__name__)
 
@@ -152,6 +159,57 @@ def run_batch():
 
 
 # ============================================================
+#  API: /files/<path> — ที่เก็บไฟล์ภาพ (อยู่บนเครื่องนี้ ข้างไฟล์ database.db)
+#    PUT    = PC2 ส่งไฟล์มาเก็บ (body เป็น byte ของไฟล์)
+#    GET    = PC2 ขอไฟล์ไปส่งต่อให้ browser
+#    DELETE = PC2 สั่งลบไฟล์
+#  ผ่าน check_client() เหมือน /sql (ต้องมาจาก IP ของ PC2 + มี token)
+# ============================================================
+def _file_path(rel_path):
+    """แปลง path จาก URL เป็น path จริงใต้ STORAGE_DIR
+    รับเฉพาะใต้ outputs/ และกัน ../ ไม่ให้หลุดออกนอกโฟลเดอร์ (เช่นไปทับ database.db)"""
+    if not rel_path.startswith("outputs/"):
+        return None
+    return safe_join(STORAGE_DIR, rel_path)
+
+
+@app.route("/files/<path:rel_path>", methods=["PUT"])
+def put_file(rel_path):
+    full = _file_path(rel_path)
+    if full is None:
+        return jsonify({"error": "path ของไฟล์ไม่ถูกต้อง"}), 400
+    data = request.get_data()
+    if not data:
+        return jsonify({"error": "ไม่ได้ส่งไฟล์มา"}), 400
+
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "wb") as f:
+        f.write(data)
+    print(f"[FILE] เก็บ {rel_path}  ({len(data) // 1024} KB)", flush=True)
+    return jsonify({"path": rel_path, "size": len(data)})
+
+
+@app.route("/files/<path:rel_path>", methods=["GET"])
+def get_file(rel_path):
+    full = _file_path(rel_path)
+    if full is None or not os.path.isfile(full):
+        return jsonify({"error": "ไม่พบไฟล์"}), 404
+    return send_file(full)
+
+
+@app.route("/files/<path:rel_path>", methods=["DELETE"])
+def delete_file(rel_path):
+    full = _file_path(rel_path)
+    if full is None:
+        return jsonify({"error": "path ของไฟล์ไม่ถูกต้อง"}), 400
+    if not os.path.isfile(full):
+        return jsonify({"deleted": False})
+    os.remove(full)
+    print(f"[FILE] ลบ {rel_path}", flush=True)
+    return jsonify({"deleted": True})
+
+
+# ============================================================
 #  API: /health — ให้เครื่องอื่นเช็คว่า DB Server ยังมีชีวิต
 # ============================================================
 @app.route("/health")
@@ -169,6 +227,7 @@ def health():
         "status": "ok",
         "role": "database",
         "db_path": DB_PATH,
+        "storage": STORAGE_DIR,
         "users": users,
         "generations": gens,
         "edits": edits,
@@ -179,7 +238,9 @@ if __name__ == "__main__":
     conn = get_conn()
     init_db(conn)
     conn.close()
+    os.makedirs(os.path.join(STORAGE_DIR, "outputs", "edits"), exist_ok=True)
     print(f"[DB SERVER] ไฟล์ฐานข้อมูล : {DB_PATH}")
+    print(f"[DB SERVER] ที่เก็บไฟล์ภาพ : {STORAGE_DIR}")
     print(f"[DB SERVER] เปิดรับ       : http://0.0.0.0:{DB_PORT}")
     print(f"[DB SERVER] อนุญาต IP     : {ALLOWED_CLIENT_IPS or 'ทุก IP'}")
     # threaded=True เพื่อรับหลาย request พร้อมกันได้ (มี _write_lock กันชนกันอยู่แล้ว)
