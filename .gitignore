@@ -220,6 +220,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# ---- ImageProject ----
+# ไฟล์ภาพที่ระบบสร้างระหว่างใช้งาน (อยู่บนเครื่อง PC2)
+pc2-backend/storage/outputs/
+# ฐานข้อมูล (อยู่บนเครื่อง PC4)
+pc4-database/database.db
+# ฐานข้อมูล + ไฟล์ภาพของโหมดรันเครื่องเดียว
+single-pc/data/
+
 # Output Images
 *.png
 *.jpg
