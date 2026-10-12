@@ -36,11 +36,11 @@ function mediaUrl(url) {
   return API_BASE + url;
 }
 
-/** หนีอักขระพิเศษก่อนยัดลง innerHTML (กัน prompt ที่มี < > ทำหน้าเว็บพัง) */
+/** หนีอักขระพิเศษก่อนยัดลง innerHTML (กัน prompt ที่มี < > ทำหน้าเว็บพัง)
+ *  ต้องหนี " และ ' ด้วย เพราะค่านี้ถูกใช้ใน attribute (alt="..." title="...") ด้วย */
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
+  return (text == null ? "" : String(text)).replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch]);
 }
 
 /**

@@ -13,7 +13,7 @@ Browser ──> http://127.0.0.1:5000
 - **ใช้โค้ดชุดเดียวกับ 4 เครื่อง** ไม่ได้ก๊อปโค้ดมา — `run_single_pc.py` แค่เปลี่ยนที่อยู่ให้ชี้ 127.0.0.1
   แก้โค้ดใน `pc2-backend` / `pc4-database` / `pc1-frontend` แล้วโหมดนี้ได้ผลด้วยทันที
 - **ไม่ต้องแก้ `config.py`** ของ 4 เครื่อง และไม่ต้องติดตั้ง Nginx
-- **ข้อมูลแยกไว้ที่ `single-pc/data/`** (ฐานข้อมูล + ไฟล์ภาพ) ไม่ปนกับไฟล์ที่ใช้บน PC2 / PC4
+- **ข้อมูลแยกไว้ที่ `single-pc/data/`** (ฐานข้อมูล + ไฟล์ภาพ + log) ไม่ปนกับไฟล์ที่ใช้บน PC2 / PC4
 
 ## ติดตั้ง (ครั้งเดียว)
 
@@ -21,7 +21,7 @@ Browser ──> http://127.0.0.1:5000
 
 ## รัน
 
-1. เปิด Stability Matrix แล้ว Launch Forge (ต้องมี `--api` และ `--api-auth admin:cdti1234` ส่วน `--listen` ไม่จำเป็น)
+1. เปิด Stability Matrix แล้ว Launch Forge (ต้องมี `--api` และ `--api-auth <user>:<pass>` ให้ตรงกับ `FORGE_API_USER/PASS` ใน `pc2-backend/.env` ส่วน `--listen` ไม่จำเป็น)
 2. ดับเบิลคลิก **`start.bat`** — เบราว์เซอร์จะเปิด `http://127.0.0.1:5000` ให้เอง
 3. สมัครสมาชิกคนแรก จะได้เป็น admin อัตโนมัติ
 
@@ -46,7 +46,7 @@ Browser ──> http://127.0.0.1:5000
 | ของเดิม | วางที่ |
 |---|---|
 | `database.db` (จาก PC4) | `single-pc/data/database.db` |
-| โฟลเดอร์ `outputs` (จาก PC2 `pc2-backend/storage/outputs`) | `single-pc/data/storage/outputs` |
+| โฟลเดอร์ `outputs` (จาก PC4 `pc4-database/storage/outputs`) | `single-pc/data/storage/outputs` |
 
 ## ปัญหาที่เจอบ่อย
 
@@ -54,4 +54,4 @@ Browser ──> http://127.0.0.1:5000
 |---|---|
 | `เปิด Database ที่พอร์ต 5100 ไม่ได้` | เปิด `pc4-database/start.bat` ค้างไว้ หรือรัน start.bat ซ้ำ 2 หน้าต่าง |
 | `Address already in use` พอร์ต 5000 | เปิด `pc2-backend/start.bat` ค้างไว้ — ปิดก่อน |
-| หน้าเว็บขึ้นแต่ dropdown checkpoint ว่าง | Forge ยังไม่เปิด หรือ `--api-auth` ไม่ตรงกับ `config.py` |
+| หน้าเว็บขึ้นแต่ dropdown checkpoint ว่าง | Forge ยังไม่เปิด หรือ `--api-auth` ไม่ตรงกับ `FORGE_API_USER/PASS` ใน `pc2-backend/.env` |

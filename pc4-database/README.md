@@ -66,5 +66,5 @@ path ในฐานข้อมูลเป็น `outputs/xxx.png` เหม�
    netsh advfirewall firewall add rule name="ImageProject DB" dir=in action=allow protocol=TCP localport=5100
    ```
 2. **ตั้ง IP เครื่องนี้เป็น 172.20.56.108 แบบ Static**
-3. **`DB_TOKEN` ใน db_server.py ต้องตรงกับใน `pc2-backend/config.py`**
+3. **คัดลอก `.env.example` เป็น `.env` แล้วตั้ง `DB_TOKEN` ให้ตรงกับใน `pc2-backend/.env`** (ไม่ตั้ง = โปรแกรมไม่ยอมเปิด)
 4. ถ้า IP เครื่อง Backend ไม่ใช่ 172.20.56.107 ให้แก้ `ALLOWED_CLIENT_IPS` ด้วย

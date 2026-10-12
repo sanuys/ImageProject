@@ -14,15 +14,30 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## ก่อนรัน — แก้ config.py
+## ก่อนรัน — แก้ config.py และสร้าง .env
+
+ที่อยู่เครื่องอื่น แก้ใน `config.py`:
 
 | ค่า | ความหมาย |
 |---|---|
 | `FORGE_API_URL` | IP:พอร์ต ของเครื่อง AI Server (PC3) |
-| `FORGE_API_USER/PASS` | ต้องตรงกับ `--api-auth` ใน Launch Options ของ Forge |
 | `DB_SERVER_URL` | IP:พอร์ต ของเครื่อง Database (PC4) |
-| `DB_TOKEN` | ต้องตรงกับใน `pc4-database/db_server.py` |
-| `SECRET_KEY` | เปลี่ยนเป็นข้อความสุ่มยาว ๆ ก่อนใช้งานจริง |
+
+ค่าลับ ไม่อยู่ในโค้ดแล้ว — คัดลอก `.env.example` เป็น `.env` (ไฟล์นี้ถูก gitignore ไว้) แล้วใส่ค่า:
+
+| ค่า | ความหมาย |
+|---|---|
+| `FORGE_API_USER/PASS` | ต้องตรงกับ `--api-auth` ใน Launch Options ของ Forge |
+| `DB_TOKEN` | ต้องตรงกับ `DB_TOKEN` ใน `pc4-database/.env` (ไม่ตั้ง = โปรแกรมไม่ยอมเปิด) |
+| `SECRET_KEY` | ข้อความสุ่มยาว ๆ ใช้เซ็น session cookie (ไม่ตั้ง = สุ่มใหม่ทุกครั้งที่เปิด ผู้ใช้ต้องล็อกอินใหม่) |
+| `FLASK_DEBUG` | `true` เฉพาะตอนพัฒนาบนเครื่องตัวเอง ปกติปล่อยเป็น `false` |
+| `GENERATE_COOLDOWN_SECONDS` | ผู้ใช้แต่ละคนต้องรอกี่วินาทีก่อนสั่งสร้างภาพครั้งถัดไป (ค่าเริ่มต้น 3, เกินจะได้ HTTP 429) |
+
+## Log
+
+เขียนลง `logs/app.log` (สร้างให้เองตอนรัน, หมุนไฟล์เมื่อถึง ~1MB เก็บย้อนหลัง 3 ไฟล์) ครอบคลุม:
+สมัครสมาชิก · ล็อกอินสำเร็จ/ไม่สำเร็จ · ออกจากระบบ · สร้างภาพ (รวมเวลาที่ใช้) · ถูกจำกัดความถี่ ·
+แก้ไขภาพ · ลบรายการ · ต่อ AI Server (PC3) หรือ Database (PC4) ไม่ได้
 
 ## รัน
 

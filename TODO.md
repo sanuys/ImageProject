@@ -97,7 +97,7 @@ machine of its own yet.
 
 ## 6. Repo hygiene
 - [x] `.env` / secrets excluded from git (done)
-- [ ] Decide whether `project.pdf` should be committed (currently untracked) or
+- [x] Decide whether `project.pdf` should be committed (currently untracked) or
       left local/gitignored
 - [x] Flesh out `README.md` with the architecture diagram, quick start, links
       to `docs/`, and the role table

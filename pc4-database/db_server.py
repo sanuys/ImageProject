@@ -25,10 +25,25 @@ from werkzeug.utils import safe_join
 
 from schema import init_db
 
+
+def _load_env_file(path):
+    """อ่านค่าจากไฟล์ .env ข้าง ๆ ไฟล์นี้ (environment variable ที่ตั้งไว้แล้วมาก่อนเสมอ)"""
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
 # ============================================================
 #  CONFIG  — แก้ได้ที่นี่ หรือ override ผ่าน environment variable
 # ============================================================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+_load_env_file(os.path.join(BASE_DIR, ".env"))
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "database.db"))
 DB_PORT = int(os.environ.get("DB_PORT", "5100"))
@@ -37,8 +52,12 @@ DB_PORT = int(os.environ.get("DB_PORT", "5100"))
 # path ในฐานข้อมูลเป็นแบบ outputs/xxx.png ซึ่งนับจากโฟลเดอร์นี้
 STORAGE_DIR = os.environ.get("STORAGE_DIR", os.path.join(BASE_DIR, "storage"))
 
-# โทเคนลับ ต้องตรงกับค่า DB_TOKEN ใน pc2-backend/config.py
-DB_TOKEN = os.environ.get("DB_TOKEN", "cdti-db-secret-2026")
+# โทเคนลับ ต้องตรงกับค่า DB_TOKEN ใน pc2-backend/.env — ไม่มีค่า default ต้องตั้งเองใน .env
+DB_TOKEN = os.environ.get("DB_TOKEN", "")
+if not DB_TOKEN:
+    raise SystemExit(
+        "[X] ยังไม่ได้ตั้งค่า DB_TOKEN — คัดลอก pc4-database/.env.example เป็น .env แล้วใส่ค่าให้ครบ"
+    )
 
 # อนุญาตเฉพาะ IP ของเครื่อง Backend (และตัวเอง) — ใส่ set() ว่างเพื่อปิดการตรวจ IP
 ALLOWED_CLIENT_IPS = {"172.20.56.107", "127.0.0.1", "::1"}

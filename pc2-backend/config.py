@@ -5,22 +5,49 @@
 ============================================================
 """
 import os
+import secrets
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+
+# ------------------------------------------------------------
+#  ค่าลับ (รหัสผ่าน / token / secret key) ไม่เขียนไว้ในโค้ดแล้ว
+#  ให้ใส่ในไฟล์ .env ข้าง ๆ ไฟล์นี้ (คัดลอกจาก .env.example) — .env ถูก gitignore ไว้
+#  ถ้าตั้ง environment variable ชื่อเดียวกันไว้ จะใช้ค่านั้นแทนค่าใน .env
+# ------------------------------------------------------------
+def _load_env_file(path):
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+_load_env_file(os.path.join(BASE_DIR, ".env"))
 
 # ------------------------------------------------------------
 #  เครื่อง AI Server (PC3) — Stability Matrix / Forge
 # ------------------------------------------------------------
 FORGE_API_URL = "http://172.20.56.170:7860"  # IP จริงของเครื่อง AI (laptop-8K067BK3) บนเน็ต CDTI_STUDENT
                                              # หมายเหตุ: เน็ตนี้แจก IP แบบ DHCP ถ้าต่อใหม่แล้ว IP เปลี่ยน ต้องแก้บรรทัดนี้ด้วย
-FORGE_API_USER = "admin"                     # ต้องตรงกับ --api-auth ใน Launch Options
-FORGE_API_PASS = "cdti1234"
+FORGE_API_USER = os.environ.get("FORGE_API_USER", "")   # ต้องตรงกับ --api-auth ใน Launch Options
+FORGE_API_PASS = os.environ.get("FORGE_API_PASS", "")
+# ปล่อยว่างทั้งคู่ได้ ถ้า Forge เปิดไว้โดยไม่ตั้ง --api-auth
+FORGE_AUTH = (FORGE_API_USER, FORGE_API_PASS) if FORGE_API_USER else None
 
 # ------------------------------------------------------------
 #  เครื่อง Database (PC4)
 # ------------------------------------------------------------
 DB_SERVER_URL = "http://172.20.56.108:5100"   # <— แก้เป็น IP จริงของเครื่อง DB
-DB_TOKEN = "cdti-db-secret-2026"             # ต้องตรงกับใน pc4-database/db_server.py
+DB_TOKEN = os.environ.get("DB_TOKEN", "")     # ต้องตรงกับ DB_TOKEN ใน pc4-database/.env
+if not DB_TOKEN:
+    raise SystemExit(
+        "[X] ยังไม่ได้ตั้งค่า DB_TOKEN — คัดลอก pc2-backend/.env.example เป็น .env แล้วใส่ค่าให้ครบ"
+    )
 DB_TIMEOUT = 15                              # วินาที
 
 # ------------------------------------------------------------
@@ -38,8 +65,18 @@ ALLOWED_ORIGINS = [
 # ------------------------------------------------------------
 #  Flask
 # ------------------------------------------------------------
-SECRET_KEY = "change-this-to-a-long-random-string-before-deploy"  # TODO: เปลี่ยนก่อนใช้จริง
+# ใช้เซ็น session cookie — ถ้าไม่ได้ตั้งไว้ใน .env จะสุ่มใหม่ทุกครั้งที่เปิดโปรแกรม
+# (ใช้งานได้ แต่ผู้ใช้ทุกคนต้องล็อกอินใหม่หลัง restart)
+SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 BACKEND_PORT = 5000
+# เปิด debugger/auto-reload ของ Flask เฉพาะตอนพัฒนา — ห้ามเปิดตอนใช้งานจริงบน LAN
+DEBUG = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
+
+# ไฟล์ log ของ Backend — logs/app.log (หมุนไฟล์เองเมื่อถึง ~1MB เก็บย้อนหลัง 3 ไฟล์)
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+
+# กันสแปม /api/generate: ผู้ใช้แต่ละคนต้องรอกี่วินาทีก่อนสั่งสร้างภาพครั้งถัดไป (0 = ไม่จำกัด)
+GENERATE_COOLDOWN_SECONDS = float(os.environ.get("GENERATE_COOLDOWN_SECONDS", "3"))
 
 # ------------------------------------------------------------
 #  ที่เก็บไฟล์ภาพ — ย้ายไปอยู่ที่ PC4 แล้ว (โฟลเดอร์ storage/ ข้าง database.db)

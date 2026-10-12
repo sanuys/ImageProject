@@ -16,6 +16,7 @@
 ============================================================
 """
 import os
+import secrets
 import sys
 import threading
 import webbrowser
@@ -50,18 +51,20 @@ sys.path.insert(0, BACKEND_DIR)
 # ------------------------------------------------------------
 #  1) แก้ค่าใน config ของ PC2 ให้ชี้มาที่เครื่องนี้ (ต้องทำก่อน import app)
 # ------------------------------------------------------------
+# Backend กับ Database อยู่ในโปรแกรมเดียวกัน จึงสุ่ม token ใช้เองได้ ไม่ต้องตั้งใน .env
+os.environ.setdefault("DB_TOKEN", secrets.token_hex(16))
+
 import config  # noqa: E402  (pc2-backend/config.py)
 
 config.FORGE_API_URL = FORGE_URL
 config.DB_SERVER_URL = f"http://127.0.0.1:{DB_PORT}"
-config.STORAGE_DIR = STORAGE_DIR
-config.OUTPUT_DIR = os.path.join(STORAGE_DIR, "outputs")
-config.EDIT_OUTPUT_DIR = os.path.join(config.OUTPUT_DIR, "edits")
+config.LOG_DIR = os.path.join(DATA_DIR, "logs")
 
 # ค่าที่ db_server.py อ่านจาก environment variable
 os.environ["DB_PATH"] = DB_PATH
 os.environ["DB_PORT"] = str(DB_PORT)
 os.environ["DB_TOKEN"] = config.DB_TOKEN
+os.environ["STORAGE_DIR"] = STORAGE_DIR
 
 # ------------------------------------------------------------
 #  2) เปิด Database Server (PC4) เป็น thread อยู่เบื้องหลัง
@@ -118,7 +121,7 @@ def check_forge():
     import requests
     try:
         r = requests.get(f"{FORGE_URL}/sdapi/v1/sd-models",
-                         auth=(config.FORGE_API_USER, config.FORGE_API_PASS), timeout=3)
+                         auth=config.FORGE_AUTH, timeout=3)
         r.raise_for_status()
         return f"พบ Forge แล้ว ({len(r.json())} โมเดล)"
     except Exception:
@@ -137,6 +140,7 @@ if __name__ == "__main__":
     print(f"  หน้าเว็บ + Backend : {url}")
     print(f"  Database          : 127.0.0.1:{DB_PORT}  ->  {DB_PATH}")
     print(f"  ไฟล์ภาพ            : {STORAGE_DIR}")
+    print(f"  ไฟล์ log           : {os.path.join(config.LOG_DIR, 'app.log')}")
     print(f"  AI (Forge)        : {FORGE_URL}  ->  {check_forge()}")
     print(f"  เช็คสถานะ          : {url}/api/health")
     print("  ปิดระบบ: กด Ctrl+C หรือปิดหน้าต่างนี้")

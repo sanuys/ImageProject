@@ -1,5 +1,12 @@
 # Progress log — restructuring against `project.pdf`
 
+> **Read this first.** Sections 1–10 below describe the *first* pass, when the
+> whole app was still one Flask process in `webapp/`. That folder, its paths
+> (`webapp/.env`, `webapp/logs/`, `webapp/tests/`, `static/outputs/`) and
+> `nginx/luma.conf` no longer exist — they are kept here as history only.
+> For the current layout see [`README.md`](../README.md) and the
+> "Pass 2" section at the end of this file.
+
 Working through [`TODO.md`](../TODO.md). This entry covers everything done in
 this pass: backend hardening, docs, tests, and deployment scaffolding. Each
 item below was actually run and checked, not just written — see "How it was
@@ -142,3 +149,71 @@ See `TODO.md` sections 0–2: the deployment-shape decision (3-PC vs 4-PC) and
 the frontend/Flask split are the two blocking decisions before the rest of the
 distributed-system work (real Nginx testing, PostgreSQL migration if 4-PC) can
 proceed.
+
+---
+
+# Pass 2 — after the 4-machine split
+
+The app was split into `pc1-frontend/`, `pc2-backend/`, `pc3-ai/`,
+`pc4-database/` and `single-pc/`. A review of that split found security holes,
+features lost in the move, and files still describing `webapp/`. This pass
+fixed the following.
+
+## 11. Secrets out of the code
+`SECRET_KEY`, the Forge user/password and `DB_TOKEN` were hardcoded in
+`pc2-backend/config.py` and `pc4-database/db_server.py`. They are now read
+from a `.env` file next to each program (templates: `.env.example`). PC2 and
+PC4 refuse to start without `DB_TOKEN`; a missing `SECRET_KEY` is replaced by
+a random one per start. Flask debug mode is off unless `FLASK_DEBUG=true`.
+
+**Still to do by hand:** the old values are in git history — choose new ones.
+
+## 12. XSS and image access
+`escapeHtml()` in `pc1-frontend/html/js/common.js` did not escape quotes but
+was used inside HTML attributes, so a prompt could inject script into the
+admin page. It now escapes `& < > " '`. `/media/...` now requires login.
+
+**Not verified in a browser** — no Node/browser was available to run the JS.
+
+## 13. Single-PC storage path
+`single-pc/run_single_pc.py` set a config value nothing read, so images went
+to `pc4-database/storage/` instead of `single-pc/data/storage/`. Fixed by
+passing `STORAGE_DIR` to the database server.
+
+## 14. Logging and generate cooldown restored
+Both existed in `webapp/app.py` (sections 2 and 4 above) and were lost in the
+split. Back in `pc2-backend/app.py`: rotating `logs/app.log`, and
+`GENERATE_COOLDOWN_SECONDS` (HTTP 429). The cooldown check is now behind a
+lock and runs after input validation.
+
+## 15. Smoke test rewritten
+`tests/smoke_test.py` replaces `webapp/tests/smoke_test.py`, which imported a
+module that no longer exists. It starts the real Database Server on a free
+port with throwaway data, drives the real Backend through Flask's test client,
+and fakes the AI Server (both "up" and "unreachable").
+
+**Verified:** 71 checks pass. **Not covered:** real generation (PC2 → PC3)
+and the Nginx layer.
+
+## 16. Backup scripts repointed
+`scripts/backup.ps1` / `backup.sh` looked for `webapp/database.db`, printed a
+warning and wrote an empty zip. They now back up `pc4-database/database.db` +
+`pc4-database/storage/` (or `single-pc/data/` with `-SinglePc`) and stop with
+an error if there is no database.
+
+**Verified:** `backup.ps1 -SinglePc` on freshly generated data — the zip
+contained `database.db` and the image under `storage/outputs/edits/`; without
+data it exits 1 and writes nothing. `backup.sh` was **not run** (no `zip` on
+the dev machine).
+
+## 17. Stale files removed
+Deleted: `nginx/luma.conf` (superseded by
+`pc1-frontend/nginx/imageproject.conf`), `docs/setup.md`, `docs/ai-server.md`
+and `docs/run/` (superseded by the README in each `pc*` folder),
+`webapp/.env.example`, `webapp/tests/`. `README.md`, `TODO.md` and
+`docs/backup.md` were rewritten for the current layout.
+
+## What to do next
+See `TODO.md` — the open security items in section 3 (rotate secrets,
+image ownership check, server-side checkpoint validation) and the queue in
+section 4.
