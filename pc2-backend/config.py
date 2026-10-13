@@ -42,7 +42,7 @@ FORGE_AUTH = (FORGE_API_USER, FORGE_API_PASS) if FORGE_API_USER else None
 # ------------------------------------------------------------
 #  เครื่อง Database (PC4)
 # ------------------------------------------------------------
-DB_SERVER_URL = "http://172.20.56.108:5100"   # <— แก้เป็น IP จริงของเครื่อง DB
+DB_SERVER_URL = "http://10.192.0.152:5100"   # <— แก้เป็น IP จริงของเครื่อง DB
 DB_TOKEN = os.environ.get("DB_TOKEN", "")     # ต้องตรงกับ DB_TOKEN ใน pc4-database/.env
 if not DB_TOKEN:
     raise SystemExit(
