@@ -15,7 +15,7 @@ import requests
 
 import config   # อ่าน user/pass ของ Forge จาก .env ชุดเดียวกับที่ Backend ใช้
 
-HOST = sys.argv[1] if len(sys.argv) > 1 else "172.20.56.170"
+HOST = sys.argv[1] if len(sys.argv) > 1 else "172.20.56.108"
 PORT = sys.argv[2] if len(sys.argv) > 2 else "7860"
 BASE = f"http://{HOST}:{PORT}"
 

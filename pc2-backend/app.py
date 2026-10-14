@@ -66,6 +66,7 @@ def _edit_json(row):
 
 
 def _generation_json(row):
+    """แปลง row ของตาราง generations ให้เป็น dict ที่ frontend ใช้ได้เลย"""
     d = dict(row)
     return {
         "id": d["id"],
@@ -206,7 +207,7 @@ def api_register():
     conn = get_db()
     if conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
         return jsonify({"error": "username นี้มีคนใช้แล้ว"}), 409
-
+    # generate_password_hash() จะ generate salt ให้เอง — ไม่ต้องทำเอง
     cursor = conn.execute(
         "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, 0, ?)",
         (username, generate_password_hash(password), datetime.utcnow().isoformat()),
