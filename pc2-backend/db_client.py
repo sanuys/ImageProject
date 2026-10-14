@@ -11,8 +11,6 @@
      row  = conn.execute("SELECT ...", (a, b)).fetchone()
      rows = conn.execute("SELECT ...").fetchall()
      cur  = conn.execute("INSERT ...", (...)); cur.lastrowid
-     conn.commit()   # no-op (DB Server commit ให้ทุกคำสั่งอยู่แล้ว)
-     conn.close()    # no-op (ไม่มี connection ค้างไว้)
 
  ต่างจากเดิมตรงที่ row ที่ได้เป็น dict ธรรมดา (ไม่ใช่ sqlite3.Row)
  แต่เข้าถึงด้วย row["column"] ได้เหมือนกัน
@@ -91,13 +89,6 @@ class Connection:
         if resp.status_code != 200:
             raise DatabaseError(f"Database Server ตอบกลับผิดพลาด ({resp.status_code})")
         return resp.json().get("lastrowids", [])
-
-    # --- เมธอดที่มีไว้ให้โค้ดเดิมเรียกได้โดยไม่พัง ---
-    def commit(self):
-        """DB Server commit ให้ทุกคำสั่งอยู่แล้ว ที่นี่จึงไม่ต้องทำอะไร"""
-
-    def close(self):
-        """ไม่มี connection ค้างไว้ (ยิง HTTP ทีละครั้ง) จึงไม่ต้องปิดอะไร"""
 
 
 def get_db():

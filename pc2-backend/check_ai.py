@@ -13,17 +13,16 @@ import sys
 
 import requests
 
-HOST = sys.argv[1] if len(sys.argv) > 1 else "172.20.56.170"
-PORT = sys.argv[2] if len(sys.argv) > 2 else "7860"
-USER = "admin"
-PASS = "cdti1234"
+import config   # อ่าน user/pass ของ Forge จาก .env ชุดเดียวกับที่ Backend ใช้
 
+HOST = sys.argv[1] if len(sys.argv) > 1 else "172.20.56.108"
+PORT = sys.argv[2] if len(sys.argv) > 2 else "7860"
 BASE = f"http://{HOST}:{PORT}"
 
 
 def check(path, label):
     try:
-        r = requests.get(f"{BASE}{path}", auth=(USER, PASS), timeout=10)
+        r = requests.get(f"{BASE}{path}", auth=config.FORGE_AUTH, timeout=10)
     except requests.exceptions.RequestException as e:
         print(f"  [X] {label}: ต่อไม่ได้ -> {e}")
         return None

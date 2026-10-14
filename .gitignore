@@ -224,6 +224,8 @@ __marimo__/
 # ---- ImageProject ----
 # ไฟล์ภาพที่ระบบสร้างระหว่างใช้งาน (อยู่บนเครื่อง PC2)
 pc2-backend/storage/outputs/
+# ไฟล์ log ของ Backend (app.log และไฟล์ที่หมุนแล้ว app.log.1 ...)
+pc2-backend/logs/
 # ฐานข้อมูล (อยู่บนเครื่อง PC4)
 pc4-database/database.db
 # ฐานข้อมูล + ไฟล์ภาพของโหมดรันเครื่องเดียว

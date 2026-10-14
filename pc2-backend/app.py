@@ -12,11 +12,15 @@
 """
 
 import json
+import logging
 import mimetypes
+import os
+import threading
 import time
 import uuid
 import base64
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 import cv2
 import numpy as np
@@ -62,6 +66,7 @@ def _edit_json(row):
 
 
 def _generation_json(row):
+    """แปลง row ของตาราง generations ให้เป็น dict ที่ frontend ใช้ได้เลย"""
     d = dict(row)
     return {
         "id": d["id"],
@@ -86,6 +91,21 @@ def _generation_json(row):
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# ------------------------------------------------------------
+#  Logging — เขียนลงไฟล์ logs/app.log แยกจากหน้าต่าง console
+#  หมุนไฟล์อัตโนมัติ (RotatingFileHandler) กันไฟล์ log บวมไม่มีที่สิ้นสุด
+# ------------------------------------------------------------
+os.makedirs(config.LOG_DIR, exist_ok=True)
+log_handler = RotatingFileHandler(
+    os.path.join(config.LOG_DIR, "app.log"), maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+)
+log_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+))
+log_handler.setLevel(logging.INFO)
+app.logger.addHandler(log_handler)
+app.logger.setLevel(logging.INFO)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -123,6 +143,7 @@ def cors_preflight(_any):
 @app.errorhandler(DatabaseError)
 def handle_db_error(e):
     """ถ้าเครื่อง PC4 ดับ/ต่อไม่ติด ให้ตอบข้อความที่อ่านเข้าใจแทน 500 เปล่า ๆ"""
+    app.logger.error("Database Server error (%s %s): %s", request.method, request.path, e)
     return jsonify({"error": str(e)}), 503
 
 
@@ -157,6 +178,7 @@ def user_json(user):
 #  (browser ไม่ได้คุยกับ PC4 ตรง ๆ — PC4 รับ request จาก PC2 เท่านั้น)
 # ============================================================
 @app.route("/media/<path:filename>")
+@login_required
 def media(filename):
     data = get_file(filename)
     if data is None:
@@ -185,7 +207,7 @@ def api_register():
     conn = get_db()
     if conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
         return jsonify({"error": "username นี้มีคนใช้แล้ว"}), 409
-
+    # generate_password_hash() จะ generate salt ให้เอง — ไม่ต้องทำเอง
     cursor = conn.execute(
         "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, 0, ?)",
         (username, generate_password_hash(password), datetime.utcnow().isoformat()),
@@ -200,6 +222,8 @@ def api_register():
     if not has_admin:
         conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (new_user_id,), "none")
 
+    app.logger.info("New user registered: %s (id=%s)%s", username, new_user_id,
+                    "" if has_admin else " — first user, promoted to admin")
     return jsonify({"message": "สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ"}), 201
 
 
@@ -215,14 +239,17 @@ def api_login():
     if row and check_password_hash(row["password_hash"], password):
         user = User(row["id"], row["username"], row["is_admin"])
         login_user(user)
+        app.logger.info("Login success: %s (id=%s)", username, row["id"])
         return jsonify({"user": user_json(user)})
 
+    app.logger.warning("Login failed for username: %s", username)
     return jsonify({"error": "username หรือ password ไม่ถูกต้อง"}), 401
 
 
 @app.route("/api/logout", methods=["POST"])
 @login_required
 def api_logout():
+    app.logger.info("Logout: %s (id=%s)", current_user.username, current_user.id)
     logout_user()
     return jsonify({"message": "ออกจากระบบแล้ว"})
 
@@ -310,9 +337,11 @@ def api_admin_delete(record_id):
     # แล้วค่อยสั่ง PC4 ลบไฟล์ภาพ
     try:
         delete_file(record["image_path"])
-    except DatabaseError:
-        pass  # ลบไฟล์ไม่สำเร็จก็ไม่เป็นไร record ใน DB ลบไปแล้ว
+    except DatabaseError as e:
+        # ลบไฟล์ไม่สำเร็จก็ไม่เป็นไร record ใน DB ลบไปแล้ว
+        app.logger.warning("Could not delete image file %s: %s", record["image_path"], e)
 
+    app.logger.info("Admin %s deleted generation id=%s", current_user.username, record_id)
     return jsonify({"message": "ลบรายการนี้แล้ว"})
 
 
@@ -333,9 +362,10 @@ def api_edit_delete(record_id):
 
     try:
         delete_file(record["result_image"])
-    except DatabaseError:
-        pass
+    except DatabaseError as e:
+        app.logger.warning("Could not delete image file %s: %s", record["result_image"], e)
 
+    app.logger.info("Edit deleted: id=%s user=%s", record_id, current_user.username)
     return jsonify({"message": "ลบรายการแก้ไขนี้แล้ว"})
 
 
@@ -349,7 +379,7 @@ def api_samplers():
     try:
         resp = requests.get(
             f"{config.FORGE_API_URL}/sdapi/v1/samplers",
-            auth=(config.FORGE_API_USER, config.FORGE_API_PASS),
+            auth=config.FORGE_AUTH,
             timeout=(5, 10),   # (เชื่อมต่อ, รอผล)
         )
         resp.raise_for_status()
@@ -368,7 +398,7 @@ def api_checkpoints():
     try:
         resp = requests.get(
             f"{config.FORGE_API_URL}/sdapi/v1/sd-models",
-            auth=(config.FORGE_API_USER, config.FORGE_API_PASS),
+            auth=config.FORGE_AUTH,
             timeout=(5, 10),   # (เชื่อมต่อ, รอผล)
         )
         resp.raise_for_status()
@@ -405,7 +435,23 @@ def api_checkpoints():
 
 # ============================================================
 #  API: generate (text-to-image)  -> PC3
+#  จำกัดความถี่ต่อผู้ใช้: กันยิงรัว ๆ ใส่ AI Server ที่ generate ทีละหลายสิบวินาที
 # ============================================================
+_last_generate_at = {}   # user_id -> เวลา (unix) ของคำขอล่าสุดที่ผ่านการจำกัดความถี่
+_generate_lock = threading.Lock()   # Flask รันแบบ threaded — กัน 2 คำขอเช็ค/เขียนเวลาพร้อมกัน
+
+
+def _generate_cooldown_left(user_id):
+    """คืนจำนวนวินาทีที่ผู้ใช้ยังต้องรอ (0 = สั่งสร้างได้เลย และจดเวลาครั้งนี้ไว้ให้แล้ว)"""
+    with _generate_lock:
+        now = time.time()
+        left = config.GENERATE_COOLDOWN_SECONDS - (now - _last_generate_at.get(user_id, 0))
+        if left > 0:
+            return left
+        _last_generate_at[user_id] = now
+        return 0
+
+
 @app.route("/api/generate", methods=["POST"])
 @login_required
 def api_generate():
@@ -434,6 +480,11 @@ def api_generate():
     width = max(64, min(width, 1024))
     height = max(64, min(height, 1024))
 
+    wait = _generate_cooldown_left(current_user.id)
+    if wait > 0:
+        app.logger.warning("Generate rate-limited: user=%s", current_user.username)
+        return jsonify({"error": f"กรุณารอสักครู่ก่อนสร้างภาพใหม่ ({wait:.1f} วินาที)"}), 429
+
     payload = {
         "prompt": prompt,
         "negative_prompt": negative_prompt,
@@ -454,22 +505,25 @@ def api_generate():
         payload["override_settings"] = {"sd_model_checkpoint": checkpoint}
         payload["override_settings_restore_afterwards"] = False
 
+    started = time.time()
     try:
         resp = requests.post(
             f"{config.FORGE_API_URL}/sdapi/v1/txt2img",
             json=payload,
-            auth=(config.FORGE_API_USER, config.FORGE_API_PASS),
+            auth=config.FORGE_AUTH,
             # (เชื่อมต่อ, รอผล) — แยกกันเพราะถ้าเครื่อง PC3 ดับ/ต่อไม่ติด ต้องรู้ผลใน 10 วิ
             # ไม่ใช่ค้างรอ 5 นาที แต่ถ้าต่อติดแล้วต้องรอนานได้ เพราะ generate ใช้เวลาจริง
             timeout=(10, 300),
         )
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
+        app.logger.warning("AI Server unreachable (generate): %s", e)
         return jsonify({"error": f"เชื่อมต่อ AI Server ไม่ได้: {e}"}), 502
 
     result = resp.json()
     images = result.get("images") or []
     if not images:
+        app.logger.warning("AI Server returned no image: user=%s", current_user.username)
         return jsonify({"error": "AI Server ไม่ได้ส่งภาพกลับมา"}), 502
 
     # ตอนขอ seed = -1 (สุ่ม) ค่า seed จริงจะอยู่ใน field "info" (JSON string) ต้อง parse เอา
@@ -500,6 +554,12 @@ def api_generate():
          sampler, actual_seed, actual_checkpoint, relative_path,
          datetime.utcnow().isoformat()),
         "none",
+    )
+
+    app.logger.info(
+        "Generation created: id=%s user=%s checkpoint=%s seed=%s size=%sx%s steps=%s took=%.1fs",
+        cursor.lastrowid, current_user.username, actual_checkpoint, actual_seed,
+        width, height, steps, time.time() - started,
     )
 
     return jsonify({
@@ -576,6 +636,9 @@ def api_edit():
         "none",
     )
 
+    app.logger.info("Edit created: id=%s user=%s operation=%s method=%s",
+                    cursor.lastrowid, current_user.username, operation, params.get("method"))
+
     return jsonify({
         "id": cursor.lastrowid,
         "image_url": media_url(relative_path),
@@ -596,7 +659,7 @@ def api_health():
     try:
         r = requests.get(
             f"{config.FORGE_API_URL}/sdapi/v1/sd-models",
-            auth=(config.FORGE_API_USER, config.FORGE_API_PASS),
+            auth=config.FORGE_AUTH,
             timeout=5,
         )
         r.raise_for_status()
@@ -615,5 +678,6 @@ if __name__ == "__main__":
     print(f"[BACKEND] Database Server : {config.DB_SERVER_URL}")
     print(f"[BACKEND] AI Server       : {config.FORGE_API_URL}")
     print(f"[BACKEND] เก็บไฟล์ภาพที่   : PC4 ({config.DB_SERVER_URL}/files/...)")
+    print(f"[BACKEND] ไฟล์ log        : {os.path.join(config.LOG_DIR, 'app.log')}")
     # host="0.0.0.0" เพื่อให้เครื่อง Nginx (PC1) ยิงเข้ามาได้
-    app.run(host="0.0.0.0", port=config.BACKEND_PORT, debug=True, threaded=True)
+    app.run(host="0.0.0.0", port=config.BACKEND_PORT, debug=config.DEBUG, threaded=True)

@@ -15,14 +15,14 @@
 
 ```
 --api
---api-auth admin:cdti1234
+--api-auth <user>:<pass>
 --listen
 ```
 
 | Flag | ทำไมต้องมี |
 |---|---|
 | `--api` | เปิด REST API (`/sdapi/v1/...`) ที่ PC2 เรียกใช้ |
-| `--api-auth user:pass` | ตั้งรหัสผ่าน API — ต้องตรงกับ `FORGE_API_USER/PASS` ใน `pc2-backend/config.py` |
+| `--api-auth user:pass` | ตั้งรหัสผ่าน API — ต้องตรงกับ `FORGE_API_USER/PASS` ใน `pc2-backend/.env` |
 | `--listen` | **สำคัญที่สุดตอนแยกเครื่อง** ถ้าไม่ใส่ Forge จะ bind แค่ 127.0.0.1 เครื่องอื่นยิงเข้าไม่ได้เลย |
 
 > ตอนระบบรันเครื่องเดียว ไม่ใส่ `--listen` ก็ยังใช้ได้เพราะ Flask อยู่เครื่องเดียวกัน
@@ -51,7 +51,7 @@ netsh advfirewall firewall add rule name="ImageProject Forge" dir=in action=allo
 **จากเครื่องนี้เอง:**
 
 ```bat
-curl -u admin:cdti1234 http://127.0.0.1:7860/sdapi/v1/sd-models
+curl -u <user>:<pass> http://127.0.0.1:7860/sdapi/v1/sd-models
 ```
 
 **จากเครื่อง Backend (PC2) — สำคัญกว่า เพราะนี่คือเส้นทางจริง:**
