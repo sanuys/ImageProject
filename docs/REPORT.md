@@ -397,15 +397,13 @@ Backend ยังคุยกับ Database ผ่าน HTTP เหมือ�
 
 ## 8. การแบ่งหน้าที่
 
-ตามตารางในโจทย์ _(ใส่ชื่อสมาชิกในคอลัมน์ "ผู้รับผิดชอบ")_
-
 | หน้าที่ | สิ่งที่ส่งมอบตามโจทย์ | สิ่งที่ทำในโครงงาน | ผู้รับผิดชอบ |
 |---|---|---|---|
-| UX/UI Frontend | หน้าเว็บ, Bootstrap, JavaScript | หน้าเว็บ static 4 หน้า, JavaScript เรียก API (ใช้ CSS เขียนเองแทน Bootstrap) | |
-| Flask Backend | Authentication, API, Database, Logging | ระบบสมาชิก, JSON API 14 เส้นทาง, `db_client`, log แบบหมุนไฟล์ | |
-| AI Engineer | Image Generation, Image Editing, Model/LoRA, ทดสอบ API, Queue | สร้างภาพผ่าน Forge, แก้ไขภาพ 12 วิธี, เลือกโมเดลได้ 2 ตัว, `check-ai` (ยังไม่มี LoRA และ Queue) | |
-| QA / DevOps | ทดสอบระบบ, เขียนคู่มือ, Deployment, Dashboard, Backup | smoke test, README ทุกเครื่อง, `setup.bat`/`start.bat`, หน้า admin + health, สคริปต์ backup | |
-| Reverse Proxy, Routing | — | config ของ Nginx, Database Server บน PC4 | |
+| UX/UI Frontend | หน้าเว็บ, Bootstrap, JavaScript | หน้าเว็บ static 4 หน้า, JavaScript เรียก API (ใช้ CSS เขียนเองแทน Bootstrap) | PC-1 |
+| Flask Backend | Authentication, API, Database, Logging | ระบบสมาชิก, JSON API 14 เส้นทาง, `db_client`, log แบบหมุนไฟล์ | PC-2, PC-4 |
+| AI Engineer | Image Generation, Image Editing, Model/LoRA, ทดสอบ API, Queue | สร้างภาพผ่าน Forge, แก้ไขภาพ 12 วิธี, เลือกโมเดลได้ 2 ตัว, `check-ai` (ยังไม่มี LoRA และ Queue) | PC-3|
+| QA / DevOps | ทดสอบระบบ, เขียนคู่มือ, Deployment, Dashboard, Backup | smoke test, README ทุกเครื่อง, `setup.bat`/`start.bat`, หน้า admin + health, สคริปต์ backup | PC-2 |
+| Reverse Proxy, Routing | — | config ของ Nginx, Database Server บน PC4 | PC-1, PC-4 |
 
 ---
 
