@@ -5,7 +5,7 @@
 > (`webapp/.env`, `webapp/logs/`, `webapp/tests/`, `static/outputs/`) and
 > `nginx/luma.conf` no longer exist — they are kept here as history only.
 > For the current layout see [`README.md`](../README.md) and the
-> "Pass 2" section at the end of this file.
+> "Pass 2" and "Pass 3" sections at the end of this file.
 
 Working through [`TODO.md`](../TODO.md). This entry covers everything done in
 this pass: backend hardening, docs, tests, and deployment scaffolding. Each
@@ -192,7 +192,7 @@ module that no longer exists. It starts the real Database Server on a free
 port with throwaway data, drives the real Backend through Flask's test client,
 and fakes the AI Server (both "up" and "unreachable").
 
-**Verified:** 71 checks pass. **Not covered:** real generation (PC2 → PC3)
+**Verified:** 70 checks pass (first written here as 71 — a miscount). **Not covered:** real generation (PC2 → PC3)
 and the Nginx layer.
 
 ## 16. Backup scripts repointed
@@ -213,7 +213,74 @@ and `docs/run/` (superseded by the README in each `pc*` folder),
 `webapp/.env.example`, `webapp/tests/`. `README.md`, `TODO.md` and
 `docs/backup.md` were rewritten for the current layout.
 
+---
+
+# Pass 3 — report, real machines, first incident (13–14 Oct)
+
+## 18. Project report and tech stack
+`docs/REPORT.md` (Thai): introduction, architecture and design reasons, each
+machine in detail, the 12 image-processing methods with formulas, security,
+testing, installation/backup, role table, limitations, conclusion. A Tech
+Stack table was added to both the report (section 2.2) and `README.md`.
+The team has since filled in the cover (members and machine assignment).
+
+**Still empty in the report:** the real-machine results table (section 6.2)
+and the "ผู้รับผิดชอบ" column (section 8).
+
+## 19. Changes by the team
+- `pc2-backend/db_client.py`: removed the unused no-op `commit()` / `close()`
+  methods (nothing in `app.py` called them).
+- `pc4-database/db_server.py`, `schema.py`: explanatory comments added; no
+  change to routes or behaviour.
+- `pc2-backend/config.py`: addresses updated for the current network —
+  PC1 `172.20.56.117`, PC3 `172.20.56.108`, PC4 `172.20.56.113`.
+- The local `webapp/` folder was deleted; everything is committed on the
+  `cleanup` branch.
+
+**Verified:** `tests/smoke_test.py` re-run after these edits on 14 Oct — all
+70 checks pass. (Section 15 originally said 71; that was a miscount, the test
+file has not changed.)
+
+**Not updated yet:** the address table in `README.md`, section 2.1 of the
+report and several comments still show the old addresses — see `TODO.md`
+section 0.
+
+## 20. First run on the real machines (14 Oct)
+Evidence is `pc2-backend/logs/app.log` on PC2 (the logging restored in
+section 14) plus direct checks from PC2:
+
+- **PC2 → PC4 works.** `/health` on PC4 answered with real data (2 users,
+  12 generations, 26 edits at 07:51) and read queries took about 0.05 s.
+- **PC2 → PC3 works.** 8 images generated at 1024×1024 with both
+  allow-listed checkpoints, taking 34–116 s each (most 40–85 s).
+- Not established from the log: whether those requests came through Nginx
+  on PC1 or straight to port 5000.
+
+## 21. Incident: PC4 read timeouts (14 Oct, 07:28–07:59)
+About 25 requests (login, register, `/api/me`) failed with
+`Read timed out (read timeout=15)` from the Database Server.
+
+**What was ruled out**, by testing from PC2 at 07:51: the network (TCP
+connect in 0.08 s), the token (a wrong token got an immediate 401) and the IP
+allow-list (queries with the real token succeeded). So PC4 was reachable and
+accepting connections, but slow to answer.
+
+**What was observed:** one `/health` call took 4 s and one write that changes
+zero rows took 13.2 s, while the calls right after each took 0.05 s. The
+stall is intermittent and is on PC4, not on the network.
+
+**Cause: not confirmed** — the investigation was stopped before looking at
+PC4 itself. Candidates, in the order worth checking, are listed in `TODO.md`
+section 3 (paused console window, `database.db` open in another program,
+PC2's 15 s timeout being shorter than SQLite's 30 s busy timeout).
+
+A separate short burst at 09:17 (8 errors) was different: PC4 answered 403
+"IP 172.20.56.107 not allowed", i.e. the allow-list on PC4 was briefly wrong.
+It was working again by 09:19.
+
 ## What to do next
-See `TODO.md` — the open security items in section 3 (rotate secrets,
-image ownership check, server-side checkpoint validation) and the queue in
-section 4.
+See `TODO.md`. In order: find the cause of the PC4 stalls (section 3), take a
+first real backup of PC4 (section 5), bring the addresses in the docs back in
+line with `config.py` (section 0), then the open security items (rotate
+secrets, image ownership check, server-side checkpoint validation) and the
+queue (section 4).

@@ -236,3 +236,7 @@ single-pc/data/
 *.jpg
 *.jpeg
 *.gif
+
+# documents 
+TODO.md
+PROGRESS.md
