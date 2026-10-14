@@ -212,18 +212,18 @@
             </select>
             <p class="op-desc method-fields" data-methods="negative">เอาค่าสูงสุดลบค่าเดิม <b>s = 255 − r</b> → ขาวกลายเป็นดำ ดำกลายเป็นขาว เหมาะดูรายละเอียดสีขาวในพื้นดำ</p>
             <p class="op-desc method-fields" data-methods="log"><b>s = c · log(1 + r)</b> โดย c = 255 / log(256) → ยืดช่วงมืดให้เห็นรายละเอียด บีบช่วงสว่าง (ใช้แสดง Fourier spectrum ที่ค่าต่างกันมาก)</p>
-            <div class="method-fields" data-methods="stretch">
-              <p class="op-desc">เส้นหักมุมผ่าน <b>(r1, s1)</b> และ <b>(r2, s2)</b> — ช่วง r1 ถึง r2 ถ้าเส้นชันกว่า 45° คือยืด contrast ของช่วงนั้น (ต้องตั้ง r1 &lt; r2)</p>
-              <div class="row">
-                <div class="field">
-                  <label for="edit-r1">r1 (ค่าเดิม) <span data-val-for="edit-r1">70</span></label>
-                  <input type="range" id="edit-r1" data-param="r1" min="1" max="254" step="1" value="70">
-                </div>
-                <div class="field">
-                  <label for="edit-s1">s1 (ค่าใหม่) <span data-val-for="edit-s1">20</span></label>
-                  <input type="range" id="edit-s1" data-param="s1" min="0" max="255" step="1" value="20">
-                </div>
-              </div>
+            <div class="method-fields" data-methods="stretch">  <!-- stretch = contrast stretching -->
+              <p class="op-desc">เส้นหักมุมผ่าน <b>(r1, s1)</b> และ <b>(r2, s2)</b> — ช่วง r1 ถึง r2 ถ้าเส้นชันกว่า 45° คือยืด contrast ของช่วงนั้น (ต้องตั้ง r1 &lt; r2)</p> <!-- r1, r2 = ค่าเดิม, s1, s2 = ค่าใหม่ -->
+              <div class="row"> <!-- row 1 -->
+                <div class="field"> <!-- ค่าเดิม r1 -->
+                  <label for="edit-r1">r1 (ค่าเดิม) <span data-val-for="edit-r1">70</span></label> <!-- ค่าเดิมของพิกเซลในช่วงที่ต้องยืด contrast -->
+                  <input type="range" id="edit-r1" data-param="r1" min="1" max="254" step="1" value="70"> <!-- slider สำหรับเลือกค่าเดิม r1 -->
+                </div> <!-- ค่าใหม่ s1 -->
+                <div class="field"> <!-- ค่าใหม่ของพิกเซลในช่วงที่ต้องยืด contrast -->
+                  <label for="edit-s1">s1 (ค่าใหม่) <span data-val-for="edit-s1">20</span></label> <!-- slider สำหรับเลือกค่าใหม่ s1 -->
+                  <input type="range" id="edit-s1" data-param="s1" min="0" max="255" step="1" value="20"> <!-- slider สำหรับเลือกค่าใหม่ s1 -->
+                </div> <!-- ค่าเดิม r2 -->
+              </div><!-- row 2 -->
               <div class="row">
                 <div class="field">
                   <label for="edit-r2">r2 (ค่าเดิม) <span data-val-for="edit-r2">180</span></label>
@@ -345,8 +345,8 @@
     </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/main.js"></script>
-</body>
+  <script src="js/config.js"></script> <!-- โหลด config สำหรับ application ที่อยุ่ในไฟล์ config.js -->
+  <script src="js/common.js"></script> <!-- โหลด common function สำหรับ application ที่อยุ่ในไฟล์ common.js ใช้สำหรับ function ที่ใช้ร่วมกันหลาย ๆ หน้า เช่น แสดง flash message, แสดง modal, แสดง loading spinner -->
+  <script src="js/main.js"></script>   <!-- โหลด main function สำหรับ application ที่อยุ่ในไฟล์ main.js code หลักของ application จะอยู่ในไฟล์นี้ -->
+</body>                                <!-- สลับไม่ได้ เอาไว้ท้ายสุดเพราะช่วยให้ HTML ถูกอ่านและแสดงผลก่อน แล้วค่อยโหลดสคริปต์ เพราะโค้ด JS มักต้องเข้าถึง element ในหน้า (เช่น ปุ่ม, รายการรูป) ถ้าโหลดก่อนที่ element จะถูกสร้าง จะหา element ไม่เจอ -->
 </html>
