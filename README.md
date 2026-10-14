@@ -27,15 +27,15 @@
        ▼
 ┌────────────────────────────────────────────────────────┐
 │ PC1 : Frontend & Reverse Proxy (Nginx)                 │
-│   • เสิร์ฟไฟล์ Static Web (HTML5 / CSS3 / Vanilla JS)   │
-│   • ส่งต่อ /api/ และ /media/ ไปยัง PC2                 │
+│   • เสิร์ฟไฟล์ Static Web (HTML5 / CSS3 / Vanilla JS)     │
+│   • ส่งต่อ /api/ และ /media/ ไปยัง PC2                    │
 └───────────────────────┬────────────────────────────────┘
                         │ HTTP :5000
                         ▼
 ┌────────────────────────────────────────────────────────┐
 │ PC2 : Logic Tier (Flask Backend)                       │
-│   • ระบบสมาชิก (Session Auth), สิทธิ์ผู้ดูแล (Admin)   │
-│   • Image Processing ด้วย OpenCV (4 กลุ่ม 12 ฟังก์ชัน) │
+│   • ระบบสมาชิก (Session Auth), สิทธิ์ผู้ดูแล (Admin)         │
+│   • Image Processing ด้วย OpenCV (4 กลุ่ม 12 ฟังก์ชัน)      │
 │   • Cooldown Rate Limiting, Audit Logging              │
 └───────────────┬────────────────────────┬───────────────┘
                 │ HTTP :7860             │ HTTP :5100
@@ -44,7 +44,7 @@
 ┌──────────────────────────────┐ ┌──────────────────────────────────────┐
 │ PC3 : AI Server              │ │ PC4 : Data Tier                      │
 │   • Stable Diffusion Forge   │ │   • SQLite Database via HTTP API     │
-│   • โมเดล Text-to-Image      │ │   • ที่เก็บไฟล์ภาพทั้งหมด (storage/) │
+│   • โมเดล Text-to-Image      │ │   • ที่เก็บไฟล์ภาพทั้งหมด (storage/)      │
 └──────────────────────────────┘ └──────────────────────────────────────┘
 ```
 
