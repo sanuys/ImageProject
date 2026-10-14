@@ -32,7 +32,7 @@ _load_env_file(os.path.join(BASE_DIR, ".env"))
 # ------------------------------------------------------------
 #  เครื่อง AI Server (PC3) — Stability Matrix / Forge
 # ------------------------------------------------------------
-FORGE_API_URL = "http://172.20.56.170:7860"  # IP จริงของเครื่อง AI (laptop-8K067BK3) บนเน็ต CDTI_STUDENT
+FORGE_API_URL = "http://172.20.56.108:7860"  # IP จริงของเครื่อง AI (laptop-8K067BK3) บนเน็ต CDTI_STUDENT
                                              # หมายเหตุ: เน็ตนี้แจก IP แบบ DHCP ถ้าต่อใหม่แล้ว IP เปลี่ยน ต้องแก้บรรทัดนี้ด้วย
 FORGE_API_USER = os.environ.get("FORGE_API_USER", "")   # ต้องตรงกับ --api-auth ใน Launch Options
 FORGE_API_PASS = os.environ.get("FORGE_API_PASS", "")
@@ -42,7 +42,7 @@ FORGE_AUTH = (FORGE_API_USER, FORGE_API_PASS) if FORGE_API_USER else None
 # ------------------------------------------------------------
 #  เครื่อง Database (PC4)
 # ------------------------------------------------------------
-DB_SERVER_URL = "http://10.192.0.152:5100"   # <— แก้เป็น IP จริงของเครื่อง DB
+DB_SERVER_URL = "http://172.20.56.113:5100"   # <— แก้เป็น IP จริงของเครื่อง DB
 DB_TOKEN = os.environ.get("DB_TOKEN", "")     # ต้องตรงกับ DB_TOKEN ใน pc4-database/.env
 if not DB_TOKEN:
     raise SystemExit(
@@ -56,8 +56,8 @@ DB_TIMEOUT = 15                              # วินาที
 #  ไม่ต้องใช้ CORS เลย — รายการนี้เผื่อกรณีเปิดไฟล์ HTML ตรง ๆ ตอนพัฒนา
 # ------------------------------------------------------------
 ALLOWED_ORIGINS = [
-    "http://172.20.56.128",
-    "http://172.20.56.128:80",
+    "http://172.20.56.117",
+    "http://172.20.56.117:80",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
