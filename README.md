@@ -255,5 +255,7 @@ powershell -ExecutionPolicy Bypass -File scripts\backup.ps1 -SinglePc
 - [`docs/REPORT.md`](docs/REPORT.md) — รายงานโครงงานฉบับสมบูรณ์ (ทฤษฎีการประมวลผลภาพ, สถาปัตยกรรม, ผลการทดสอบ)
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — บันทึกประวัติและขั้นตอนการพัฒนาระบบ
 - [`docs/backup.md`](docs/backup.md) — คู่มือการสำรองและกู้คืนข้อมูล
-- [`TODO.md`](TODO.md) — รายการงานที่เสร็จสิ้นและสิ่งที่ต้องดำเนินการต่อ
-- [`project.pdf`](project.pdf) — เอกสารข้อกำหนดโจทย์โครงงาน
+- [`docs/TODO.md`](docs/TODO.md) — รายการงานที่เสร็จสิ้นและสิ่งที่ต้องดำเนินการต่อ
+- [`docs/project.pdf`](docs/project.pdf) — เอกสารข้อกำหนดโจทย์โครงงาน
+- [`docs/ImageProject_Slide.pdf`](docs/ImageProject_Slide.pdf) — สไลด์นำเสนอโปรเจค
+- [`docs/Guide.html`](docs/Guide.html`) — ไกด์แสดงกระบวนการทำงานทีละขั้นตอน
