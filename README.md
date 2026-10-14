@@ -258,4 +258,4 @@ powershell -ExecutionPolicy Bypass -File scripts\backup.ps1 -SinglePc
 - [`docs/TODO.md`](docs/TODO.md) — รายการงานที่เสร็จสิ้นและสิ่งที่ต้องดำเนินการต่อ
 - [`docs/project.pdf`](docs/project.pdf) — เอกสารข้อกำหนดโจทย์โครงงาน
 - [`docs/ImageProject_Slide.pdf`](docs/ImageProject_Slide.pdf) — สไลด์นำเสนอโปรเจค
-- [`docs/Guide.html`](docs/Guide.html`) — ไกด์แสดงกระบวนการทำงานทีละขั้นตอน
+- [`docs/Guide.html`](docs/Guide.html) — ไกด์แสดงกระบวนการทำงานทีละขั้นตอน
